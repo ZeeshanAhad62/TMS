@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc -t markdown \"C:\\\\Users\\\\Administrator\\\\Downloads\\\\Fleet_Master_Requirements.docx\")",
+      "Bash(python3 -c \"import docx\")",
+      "Bash(python -c \"import docx\")",
+      "Bash(/c/Python314/python extract.py unpacked/word/document.xml requirements.txt)",
+      "Bash(/c/Python314/python -c ' *)",
+      "Bash(dotnet --version)",
+      "Bash(dotnet --list-sdks)",
+      "Bash(sqllocaldb info *)",
+      "Bash(dotnet tool *)",
+      "Bash(dotnet add *)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet ef *)",
+      "Read(//d/Zeeshan/Transport Management System/Project/**)",
+      "Bash(dotnet new *)",
+      "Bash(dotnet sln *)",
+      "Bash(mkdir -p 'D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\FleetMaster.Shared/Dtos')",
+      "Bash(mv 'D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\TransportationSystemApi\\\\TransportationSystemApi/Models/Enums.cs' 'D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\FleetMaster.Shared/Enums.cs')",
+      "Bash(mv 'D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\TransportationSystemApi\\\\TransportationSystemApi/Dtos/VehicleDtos.cs' 'D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\FleetMaster.Shared/Dtos/VehicleDtos.cs')",
+      "Bash(mv 'D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\TransportationSystemApi\\\\TransportationSystemApi/Dtos/ChildDtos.cs' 'D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\FleetMaster.Shared/Dtos/ChildDtos.cs')",
+      "Bash(mkdir -p \"D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\FleetMaster.Web\\\\Services\")",
+      "Bash(mkdir -p \"D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\FleetMaster.Web\\\\Components\\\\Pages\\\\FleetMaster\")",
+      "Bash(mkdir -p \"D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\FleetMaster.Web\\\\Components\\\\Shared\")",
+      "Bash(powershell -NoProfile -Command \"\\(Get-Content -Raw 'D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\FleetMaster.Web\\\\Components\\\\Pages\\\\FleetMaster\\\\FleetVehicleEditor.razor'\\) -replace 'AsDateTime', '' | Set-Content -NoNewline -Encoding utf8 'D:\\\\Zeeshan\\\\Transport Management System\\\\Project\\\\FleetMaster.Web\\\\Components\\\\Pages\\\\FleetMaster\\\\FleetVehicleEditor.razor'\")",
+      "Bash(dotnet run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5141/api/vehicles --max-time 3)",
+      "Bash(curl -s -o /dev/null -w \"API status: %{http_code}\\\\n\" http://localhost:5141/api/vehicles --max-time 5)",
+      "Bash(curl -s -o /dev/null -w \"Web status: %{http_code}\\\\n\" http://localhost:5244/ --max-time 5)",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq *\" //IM FleetMaster.Web.exe)",
+      "Bash(wmic process *)",
+      "Bash(curl -s http://localhost:5141/api/vehicles)",
+      "Bash(curl -s http://localhost:5141/api/vehicles/2)",
+      "Bash(curl -sv -o /dev/null -w \"Web status: %{http_code}\\\\n\" http://localhost:5244/ --max-time 10)",
+      "Bash(curl -s -o /dev/null -w \"Web status: %{http_code}\\\\n\" http://localhost:5244/ --max-time 8)",
+      "Bash(curl -s -X DELETE http://localhost:5141/api/vehicles/1 -o /dev/null -w \"delete 1: %{http_code}\\\\n\")",
+      "Bash(curl -s -X DELETE http://localhost:5141/api/vehicles/2 -o /dev/null -w \"delete 2: %{http_code}\\\\n\")"
+    ]
+  }
+}

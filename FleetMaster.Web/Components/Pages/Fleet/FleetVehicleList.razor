@@ -1,0 +1,172 @@
+@page "/fleet-vehicles"
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Fleet Master</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Fleet Master</h2>
+        <div class="text-muted small">Fleet Management &rsaquo; Fleet Setup &rsaquo; Fleet Master</div>
+    </div>
+    <a class="btn btn-primary" href="/fleet-vehicles/new">
+        <i class="bi bi-plus-lg me-1"></i>Add Vehicle
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <input class="form-control" placeholder="Search registration, code, make, model..."
+                       @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_typeFilter">
+                    <option value="">All vehicle types</option>
+                    @foreach (var t in Enum.GetValues<VehicleType>())
+                    {
+                        <option value="@t">@t.ToDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_statusFilter">
+                    <option value="">All statuses</option>
+                    @foreach (var s in Enum.GetValues<OperationalStatus>())
+                    {
+                        <option value="@s">@s.ToDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-outline-secondary" @onclick="Load">
+                    <i class="bi bi-funnel me-1"></i>Apply
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_vehicles is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_vehicles.Count == 0)
+{
+    <div class="alert alert-info">No vehicles found. Click "Add Vehicle" to create the first Fleet Master record.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle bg-white">
+            <thead class="table-light">
+                <tr>
+                    <th>Vehicle Code</th>
+                    <th>Registration No.</th>
+                    <th>Type</th>
+                    <th>Make / Model</th>
+                    <th>Status</th>
+                    <th>Location</th>
+                    <th>Nearest Doc. Expiry</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var v in _vehicles)
+                {
+                    <tr>
+                        <td><span class="font-monospace">@v.VehicleCode</span></td>
+                        <td>@v.RegistrationNumber</td>
+                        <td>@v.VehicleType.ToDisplayName()</td>
+                        <td>@($"{v.Make} {v.Model}".Trim())</td>
+                        <td><span class="badge @StatusBadgeClass(v.CurrentStatus)">@v.CurrentStatus.ToDisplayName()</span></td>
+                        <td>@v.CurrentLocation</td>
+                        <td>
+                            @if (v.NearestDocumentExpiry is not null)
+                            {
+                                <span class="badge @(v.HasExpiringDocument ? "bg-danger" : "bg-secondary")">
+                                    @v.NearestDocumentExpiry.Value.ToString("dd-MMM-yyyy")
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">&mdash;</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/fleet-vehicles/@v.Id/edit">
+                                <i class="bi bi-pencil-square"></i> Open
+                            </a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(v.Id)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<VehicleListItemDto>? _vehicles;
+    private string _search = "";
+    private string _typeFilter = "";
+    private string _statusFilter = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            VehicleType? type = string.IsNullOrEmpty(_typeFilter) ? null : Enum.Parse<VehicleType>(_typeFilter);
+            OperationalStatus? status = string.IsNullOrEmpty(_statusFilter) ? null : Enum.Parse<OperationalStatus>(_statusFilter);
+            _vehicles = await Api.GetVehiclesAsync(_search, type, status);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load vehicles: {ex.Message}";
+            _vehicles = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Delete this vehicle and all its Fleet Master records?");
+        if (!confirmed) return;
+
+        try
+        {
+            await Api.DeleteVehicleAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete vehicle: {ex.Message}";
+        }
+    }
+
+    private static string StatusBadgeClass(OperationalStatus status) => status switch
+    {
+        OperationalStatus.Available => "bg-success",
+        OperationalStatus.OnTrip => "bg-primary",
+        OperationalStatus.UnderMaintenance => "bg-warning text-dark",
+        OperationalStatus.OutOfService => "bg-danger",
+        _ => "bg-secondary"
+    };
+}
