@@ -1,0 +1,154 @@
+.app-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+.app-sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: #1e2530;
+    color: #dfe3ea;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-logo {
+    max-height: 36px;
+    max-width: 36px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.sidebar-logo-icon {
+    font-size: 1.6rem;
+}
+
+.sidebar-brand-text .company-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.1;
+}
+
+.sidebar-brand-text .system-name {
+    font-size: 0.7rem;
+    color: #9aa4b2;
+}
+
+.sidebar-nav {
+    padding: 0.75rem 0.5rem;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.nav-section-label {
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    color: #7c8798;
+    padding: 0.5rem 0.75rem 0.25rem;
+}
+
+.nav-module {
+    margin-bottom: 0.25rem;
+}
+
+.nav-module-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #dfe3ea;
+    text-decoration: none;
+}
+
+.nav-module-header.active-module {
+    color: #fff;
+}
+
+.nav-module-header.coming-soon {
+    color: #8b96a6;
+    cursor: pointer;
+}
+
+    .nav-module-header.coming-soon:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: #dfe3ea;
+    }
+
+.nav-sublink {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.75rem 0.45rem 2rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #b7c0cc;
+    text-decoration: none;
+}
+
+    .nav-sublink:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+    }
+
+    .nav-sublink.active {
+        background: #3a6df0;
+        color: #fff;
+    }
+
+.app-main {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.app-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.topbar-title {
+    font-weight: 600;
+}
+
+.app-content {
+    padding: 1.25rem;
+    flex-grow: 1;
+    background: #f5f6f8;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }

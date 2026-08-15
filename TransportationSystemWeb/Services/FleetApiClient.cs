@@ -1,0 +1,270 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Components.Authorization;
+using TransportationSystemApi.Dtos;
+using TransportationSystemApi.Models;
+
+namespace TransportationSystemWeb.Services;
+
+public class ApiException : Exception
+{
+    public ApiException(string message) : base(message) { }
+}
+
+// Note: the Authorization header is set here in the typed client itself, not in a
+// DelegatingHandler on the HttpClientFactory pipeline. Handlers registered via
+// AddHttpMessageHandler run in a pooled scope outside the current circuit, so
+// AuthenticationStateProvider.GetAuthenticationStateAsync() throws there. Typed
+// clients, in contrast, are constructed in the caller's (circuit) DI scope.
+public class FleetApiClient
+{
+    private readonly HttpClient _http;
+    private readonly AuthenticationStateProvider _authStateProvider;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
+
+    public FleetApiClient(HttpClient http, AuthenticationStateProvider authStateProvider)
+    {
+        _http = http;
+        _authStateProvider = authStateProvider;
+    }
+
+    private async Task AuthorizeAsync()
+    {
+        var state = await _authStateProvider.GetAuthenticationStateAsync();
+        var token = state.User.FindFirst("access_token")?.Value;
+        _http.DefaultRequestHeaders.Authorization = string.IsNullOrEmpty(token)
+            ? null
+            : new AuthenticationHeaderValue("Bearer", token);
+    }
+
+    // ----- Company Profile -----
+
+    public async Task<CompanyProfileDto?> GetCompanyProfileAsync()
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync("api/company-profile");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<CompanyProfileDto>(JsonOptions);
+    }
+
+    public async Task<CompanyProfileDto> UpdateCompanyProfileAsync(CompanyProfileUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync("api/company-profile", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<CompanyProfileDto>(JsonOptions))!;
+    }
+
+    public async Task<CompanyProfileDto> UploadCompanyLogoAsync(string fileName, string contentType, Stream content)
+    {
+        await AuthorizeAsync();
+        using var form = new MultipartFormDataContent();
+        using var streamContent = new StreamContent(content);
+        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        form.Add(streamContent, "file", fileName);
+
+        var response = await _http.PostAsync("api/company-profile/logo", form);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<CompanyProfileDto>(JsonOptions))!;
+    }
+
+    // ----- Users -----
+
+    public async Task<List<UserDto>> GetUsersAsync()
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<List<UserDto>>("api/users", JsonOptions) ?? new();
+    }
+
+    public async Task<UserDto> CreateUserAsync(UserCreateDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/users", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<UserDto>(JsonOptions))!;
+    }
+
+    public async Task DeactivateUserAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsync($"api/users/{id}/deactivate", null);
+        await EnsureSuccess(response);
+    }
+
+    public async Task ActivateUserAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsync($"api/users/{id}/activate", null);
+        await EnsureSuccess(response);
+    }
+
+    // ----- Vehicles -----
+
+    public async Task<List<VehicleListItemDto>> GetVehiclesAsync(string? search = null, VehicleType? type = null, OperationalStatus? status = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        if (type.HasValue) query.Add($"vehicleType={type}");
+        if (status.HasValue) query.Add($"status={status}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+
+        return await _http.GetFromJsonAsync<List<VehicleListItemDto>>($"api/vehicles{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<VehicleDetailDto?> GetVehicleAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/vehicles/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<VehicleDetailDto>(JsonOptions);
+    }
+
+    public async Task<VehicleDetailDto> CreateVehicleAsync(VehicleUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/vehicles", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<VehicleDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateVehicleAsync(int id, VehicleUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/vehicles/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteVehicleAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/vehicles/{id}");
+        await EnsureSuccess(response);
+    }
+
+    // ----- Documents -----
+
+    public async Task<VehicleDocumentDto> UploadDocumentAsync(int vehicleId, DocumentCategory category, string fileName, string contentType, Stream content)
+    {
+        await AuthorizeAsync();
+        using var form = new MultipartFormDataContent();
+        using var streamContent = new StreamContent(content);
+        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        form.Add(new StringContent(category.ToString()), "category");
+        form.Add(streamContent, "file", fileName);
+
+        var response = await _http.PostAsync($"api/vehicles/{vehicleId}/documents", form);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<VehicleDocumentDto>(JsonOptions))!;
+    }
+
+    public async Task DeleteDocumentAsync(int vehicleId, int documentId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/vehicles/{vehicleId}/documents/{documentId}");
+        await EnsureSuccess(response);
+    }
+
+    // ----- Alerts -----
+
+    public async Task<AlertRuleDto> CreateAlertAsync(int vehicleId, AlertRuleUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/vehicles/{vehicleId}/alerts", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<AlertRuleDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateAlertAsync(int vehicleId, int alertId, AlertRuleUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/vehicles/{vehicleId}/alerts/{alertId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteAlertAsync(int vehicleId, int alertId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/vehicles/{vehicleId}/alerts/{alertId}");
+        await EnsureSuccess(response);
+    }
+
+    // ----- Tyres -----
+
+    public async Task<TyreDto> CreateTyreAsync(int vehicleId, TyreUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/vehicles/{vehicleId}/tyres", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<TyreDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateTyreAsync(int vehicleId, int tyreId, TyreUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/vehicles/{vehicleId}/tyres/{tyreId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteTyreAsync(int vehicleId, int tyreId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/vehicles/{vehicleId}/tyres/{tyreId}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task AddTyreReplacementAsync(int vehicleId, int tyreId, TyreReplacementHistoryUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/vehicles/{vehicleId}/tyres/{tyreId}/replacements", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    // ----- Maintenance -----
+
+    public async Task CreateMaintenanceRecordAsync(int vehicleId, MaintenanceRecordUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/vehicles/{vehicleId}/maintenance", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteMaintenanceRecordAsync(int vehicleId, int recordId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/vehicles/{vehicleId}/maintenance/{recordId}");
+        await EnsureSuccess(response);
+    }
+
+    // ----- Bookings -----
+
+    public async Task CreateBookingAsync(int vehicleId, BookingRecordUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/vehicles/{vehicleId}/bookings", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteBookingAsync(int vehicleId, int bookingId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/vehicles/{vehicleId}/bookings/{bookingId}");
+        await EnsureSuccess(response);
+    }
+
+    private static async Task EnsureSuccess(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode) return;
+        var body = await response.Content.ReadAsStringAsync();
+        throw new ApiException(string.IsNullOrWhiteSpace(body)
+            ? $"Request failed with status {(int)response.StatusCode}."
+            : body);
+    }
+}

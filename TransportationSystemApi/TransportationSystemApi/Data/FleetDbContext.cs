@@ -16,9 +16,19 @@ public class FleetDbContext : DbContext
     public DbSet<TyreReplacementHistory> TyreReplacementHistories => Set<TyreReplacementHistory>();
     public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
     public DbSet<BookingRecord> BookingRecords => Set<BookingRecord>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<CompanyProfile> CompanyProfiles => Set<CompanyProfile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(u => u.Username).IsUnique();
+            entity.HasIndex(u => u.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<CompanyProfile>().ToTable("CompanyProfile");
+
         modelBuilder.Entity<Vehicle>(entity =>
         {
             entity.HasIndex(v => v.VehicleCode).IsUnique();

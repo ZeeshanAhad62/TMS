@@ -1,0 +1,26 @@
+@page "/modules/coming-soon/{ModuleSlug}"
+@attribute [Authorize]
+
+<PageTitle>@ModuleTitle - Coming Soon</PageTitle>
+
+<div class="text-center py-5">
+    <i class="bi bi-hourglass-split text-muted" style="font-size:3rem;"></i>
+    <h2 class="mt-3">@ModuleTitle</h2>
+    <p class="text-muted">This module is planned but not built yet.</p>
+    <a class="btn btn-outline-primary mt-2" href="/fleet-vehicles">
+        <i class="bi bi-arrow-left me-1"></i>Back to Fleet Master
+    </a>
+</div>
+
+@code {
+    [Parameter] public string ModuleSlug { get; set; } = "";
+
+    private string ModuleTitle => ModuleSlug switch
+    {
+        "driver-management" => "Driver Management",
+        "trip-booking" => "Trip / Booking Management",
+        "maintenance-workshop" => "Maintenance & Workshop",
+        "reports-analytics" => "Reports & Analytics",
+        _ => "Coming Soon"
+    };
+}

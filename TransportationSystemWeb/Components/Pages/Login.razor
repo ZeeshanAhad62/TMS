@@ -1,0 +1,77 @@
+@page "/login"
+@layout Layout.LoginLayout
+@attribute [AllowAnonymous]
+@inject NavigationManager Nav
+@inject FleetApiClient Api
+
+<PageTitle>Sign in - Transportation Management System</PageTitle>
+
+<div class="card shadow-sm" style="width: 100%; max-width: 400px;">
+    <div class="card-body p-4">
+        <div class="text-center mb-4">
+            @if (_companyLogoUrl is not null)
+            {
+                <img src="@_companyLogoUrl" alt="@_companyName" style="max-height:56px;" class="mb-2" />
+            }
+            else
+            {
+                <i class="bi bi-truck" style="font-size:2.5rem;"></i>
+            }
+            <h5 class="mt-2 mb-0">@(_companyName ?? "Transportation Management System")</h5>
+            <div class="text-muted small">Sign in to continue</div>
+        </div>
+
+        @if (_showError)
+        {
+            <div class="alert alert-danger py-2">Invalid username or password.</div>
+        }
+
+        <form method="post" action="/auth/login">
+            <input type="hidden" name="returnUrl" value="@_returnUrl" />
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input class="form-control" name="username" required autofocus />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input class="form-control" name="password" type="password" required />
+            </div>
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Sign in
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="position-fixed bottom-0 start-0 end-0 text-center text-muted small py-2">
+    Transportation Management System
+</div>
+
+@code {
+    private bool _showError;
+    private string _returnUrl = "/";
+    private string? _companyName;
+    private string? _companyLogoUrl;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        _showError = query["error"] == "1";
+        _returnUrl = query["returnUrl"] ?? "/";
+
+        try
+        {
+            var profile = await Api.GetCompanyProfileAsync();
+            if (profile is not null)
+            {
+                _companyName = profile.CompanyName;
+                _companyLogoUrl = profile.LogoUrl;
+            }
+        }
+        catch
+        {
+            // Login page must still render even if the API is briefly unreachable.
+        }
+    }
+}

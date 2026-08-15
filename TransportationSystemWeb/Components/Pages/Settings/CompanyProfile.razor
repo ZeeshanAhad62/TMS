@@ -1,0 +1,164 @@
+@page "/settings/company"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Company Profile - Settings</PageTitle>
+
+<div class="mb-3">
+    <h2 class="mb-0">Company Profile</h2>
+    <div class="text-muted small">Settings &rsaquo; Company Profile</div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+@if (_message is not null)
+{
+    <div class="alert alert-success">@_message</div>
+}
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">Logo</h5>
+            <div class="d-flex align-items-center gap-3">
+                @if (_logoUrl is not null)
+                {
+                    <img src="@_logoUrl" style="max-height:64px;max-width:160px;object-fit:contain;" class="border rounded p-1" />
+                }
+                else
+                {
+                    <div class="text-muted">No logo uploaded.</div>
+                }
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
+                        <InputFile OnChange="UploadLogo" class="form-control" style="max-width:300px;" />
+                    </Authorized>
+                    <NotAuthorized>
+                        <span class="text-muted small">Only administrators can change the logo.</span>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </div>
+
+    <AuthorizeView Roles="Admin" Context="adminAuth">
+        <Authorized>
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Company Details</h5>
+                    <EditForm Model="_model" OnValidSubmit="Save">
+                        <DataAnnotationsValidator />
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Company Name *</label>
+                                <InputText class="form-control" @bind-Value="_model.CompanyName" />
+                                <ValidationMessage For="() => _model.CompanyName" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Contact Email</label>
+                                <InputText class="form-control" @bind-Value="_model.ContactEmail" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Contact Phone</label>
+                                <InputText class="form-control" @bind-Value="_model.ContactPhone" />
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Address</label>
+                                <InputTextArea class="form-control" @bind-Value="_model.Address" rows="2" />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3">
+                            <i class="bi bi-save me-1"></i>Save Changes
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </Authorized>
+        <NotAuthorized>
+            <div class="card">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Company Name</dt><dd class="col-sm-9">@_model.CompanyName</dd>
+                        <dt class="col-sm-3">Contact Email</dt><dd class="col-sm-9">@_model.ContactEmail</dd>
+                        <dt class="col-sm-3">Contact Phone</dt><dd class="col-sm-9">@_model.ContactPhone</dd>
+                        <dt class="col-sm-3">Address</dt><dd class="col-sm-9">@_model.Address</dd>
+                    </dl>
+                </div>
+            </div>
+        </NotAuthorized>
+    </AuthorizeView>
+}
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private string? _message;
+    private string? _logoUrl;
+    private CompanyProfileUpsertDto _model = new();
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var profile = await Api.GetCompanyProfileAsync();
+            if (profile is not null)
+            {
+                _model.CompanyName = profile.CompanyName;
+                _model.Address = profile.Address;
+                _model.ContactEmail = profile.ContactEmail;
+                _model.ContactPhone = profile.ContactPhone;
+                _logoUrl = profile.LogoUrl;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load company profile: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        _error = null;
+        _message = null;
+        try
+        {
+            await Api.UpdateCompanyProfileAsync(_model);
+            _message = "Changes saved.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save company profile: {ex.Message}";
+        }
+    }
+
+    private async Task UploadLogo(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(2 * 1024 * 1024);
+            var profile = await Api.UploadCompanyLogoAsync(e.File.Name, e.File.ContentType, stream);
+            _logoUrl = profile.LogoUrl;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to upload logo: {ex.Message}";
+        }
+    }
+}

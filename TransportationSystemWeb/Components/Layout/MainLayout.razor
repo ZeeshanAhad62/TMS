@@ -1,0 +1,138 @@
+@inherits LayoutComponentBase
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+
+<div class="app-shell">
+    <aside class="app-sidebar">
+        <div class="sidebar-brand">
+            @if (_companyLogoUrl is not null)
+            {
+                <img src="@_companyLogoUrl" alt="@_companyName" class="sidebar-logo" />
+            }
+            else
+            {
+                <i class="bi bi-truck sidebar-logo-icon"></i>
+            }
+            <div class="sidebar-brand-text">
+                <div class="company-name">@(_companyName ?? "My Transport Company")</div>
+                <div class="system-name">Transportation Management System</div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section-label">Modules</div>
+
+            <div class="nav-module">
+                <div class="nav-module-header active-module">
+                    <i class="bi bi-truck"></i> Fleet Management
+                </div>
+                <a class="nav-sublink @SubLinkClass("/fleet-vehicles")" href="/fleet-vehicles">
+                    <i class="bi bi-list-ul"></i> Fleet Master
+                </a>
+            </div>
+
+            <div class="nav-module">
+                <a class="nav-module-header coming-soon" href="/modules/coming-soon/driver-management">
+                    <i class="bi bi-person-badge"></i> Driver Management
+                    <span class="badge bg-secondary ms-auto">Soon</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
+                <a class="nav-module-header coming-soon" href="/modules/coming-soon/trip-booking">
+                    <i class="bi bi-calendar-check"></i> Trip / Booking
+                    <span class="badge bg-secondary ms-auto">Soon</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
+                <a class="nav-module-header coming-soon" href="/modules/coming-soon/maintenance-workshop">
+                    <i class="bi bi-tools"></i> Maintenance &amp; Workshop
+                    <span class="badge bg-secondary ms-auto">Soon</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
+                <a class="nav-module-header coming-soon" href="/modules/coming-soon/reports-analytics">
+                    <i class="bi bi-bar-chart"></i> Reports &amp; Analytics
+                    <span class="badge bg-secondary ms-auto">Soon</span>
+                </a>
+            </div>
+
+            <div class="nav-section-label mt-3">Settings</div>
+            <div class="nav-module">
+                <a class="nav-sublink" href="/settings/company">
+                    <i class="bi bi-building"></i> Company Profile
+                </a>
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
+                        <a class="nav-sublink" href="/settings/users">
+                            <i class="bi bi-people"></i> Users
+                        </a>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </nav>
+    </aside>
+
+    <div class="app-main">
+        <header class="app-topbar">
+            <div class="topbar-title">@(_companyName ?? "Transportation Management System")</div>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="topbar-user dropdown">
+                        <button class="btn btn-link text-decoration-none dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle me-1"></i>
+                            @context.User.FindFirst("FullName")?.Value
+                            <span class="badge bg-light text-dark border ms-2">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <form method="post" action="/auth/logout">
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="bi bi-box-arrow-right me-1"></i>Sign out
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+        </header>
+
+        <main class="app-content">
+            @Body
+        </main>
+    </div>
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+@code {
+    private string? _companyName;
+    private string? _companyLogoUrl;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profile = await Api.GetCompanyProfileAsync();
+            if (profile is not null)
+            {
+                _companyName = profile.CompanyName;
+                _companyLogoUrl = profile.LogoUrl;
+            }
+        }
+        catch
+        {
+            // Fall back to defaults if the profile can't be loaded.
+        }
+    }
+
+    private string SubLinkClass(string href) =>
+        Nav.ToBaseRelativePath(Nav.Uri).StartsWith(href.TrimStart('/'), StringComparison.OrdinalIgnoreCase) ? "active" : "";
+}

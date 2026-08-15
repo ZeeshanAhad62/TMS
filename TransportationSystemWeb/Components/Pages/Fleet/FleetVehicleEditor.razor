@@ -1,0 +1,865 @@
+﻿@page "/fleet-vehicles/new"
+@page "/fleet-vehicles/{Id:int}/edit"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>@(IsNew ? "Add Vehicle" : "Edit Vehicle") - Fleet Master</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">
+            @if (IsNew)
+            {
+                <text>Add Vehicle</text>
+            }
+            else
+            {
+                <span class="font-monospace">@_detail?.VehicleCode</span> <text> &mdash; </text> @_model.RegistrationNumber
+            }
+        </h2>
+        <div class="text-muted small">Fleet Management &rsaquo; Fleet Setup &rsaquo; Fleet Master</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="/fleet-vehicles"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+@if (_message is not null)
+{
+    <div class="alert alert-success">@_message</div>
+}
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm Model="_model" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+
+        <ul class="nav nav-tabs mb-3">
+            @foreach (var tab in Tabs)
+            {
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(_activeTab == tab ? "active" : "")" @onclick="() => _activeTab = tab" disabled="@(!IsNew ? false : tab != "Vehicle Identity" && tab != "Registration & Legal" && tab != "Operational Status" && tab != "Financials")">
+                        @tab
+                    </button>
+                </li>
+            }
+        </ul>
+
+        @if (_activeTab == "Vehicle Identity")
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Vehicle Identity</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Vehicle ID / Code</label>
+                        <input class="form-control" value="@(IsNew ? "(auto-generated on save)" : _detail?.VehicleCode)" disabled />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Registration Number *</label>
+                        <InputText class="form-control" @bind-Value="_model.RegistrationNumber" />
+                        <ValidationMessage For="() => _model.RegistrationNumber" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Vehicle Type *</label>
+                        <InputSelect class="form-select" @bind-Value="_model.VehicleType">
+                            @foreach (var t in Enum.GetValues<VehicleType>())
+                            {
+                                <option value="@t">@t.ToDisplayName()</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Make</label>
+                        <InputText class="form-control" @bind-Value="_model.Make" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Model</label>
+                        <InputText class="form-control" @bind-Value="_model.Model" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Variant</label>
+                        <InputText class="form-control" @bind-Value="_model.Variant" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Year of Manufacture</label>
+                        <InputNumber class="form-control" @bind-Value="_model.YearOfManufacture" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Ownership Type *</label>
+                        <InputSelect class="form-select" @bind-Value="_model.OwnershipType">
+                            @foreach (var t in Enum.GetValues<OwnershipType>())
+                            {
+                                <option value="@t">@t.ToDisplayName()</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Fuel Type *</label>
+                        <InputSelect class="form-select" @bind-Value="_model.FuelType">
+                            @foreach (var t in Enum.GetValues<FuelType>())
+                            {
+                                <option value="@t">@t.ToDisplayName()</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Load Capacity</label>
+                        <InputNumber class="form-control" @bind-Value="_model.LoadCapacity" />
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">Unit</label>
+                        <InputText class="form-control" @bind-Value="_model.LoadCapacityUnit" placeholder="t / m3" />
+                    </div>
+                </div>
+
+                <hr />
+                <h6>Type-specific fields &mdash; @_model.VehicleType.ToDisplayName()</h6>
+                <div class="row g-3">
+                    @if (_model.VehicleType is VehicleType.Truck or VehicleType.Van or VehicleType.Bus)
+                    {
+                        <div class="col-md-4">
+                            <label class="form-label">Chassis Number</label>
+                            <InputText class="form-control" @bind-Value="_model.ChassisNumber" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Engine Number</label>
+                            <InputText class="form-control" @bind-Value="_model.EngineNumber" />
+                        </div>
+                    }
+                    @if (_model.VehicleType is VehicleType.Truck or VehicleType.Van)
+                    {
+                        <div class="col-md-4">
+                            <label class="form-label">Body Type</label>
+                            <InputText class="form-control" @bind-Value="_model.BodyType" placeholder="Flatbed, reefer, tanker, box, curtain-side..." />
+                        </div>
+                    }
+                    @if (_model.VehicleType == VehicleType.Trailer)
+                    {
+                        <div class="col-md-4">
+                            <label class="form-label">Axle Count</label>
+                            <InputNumber class="form-control" @bind-Value="_model.AxleCount" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Trailer Type</label>
+                            <InputText class="form-control" @bind-Value="_model.TrailerType" placeholder="Flatbed, tanker, lowboy..." />
+                        </div>
+                    }
+                    @if (_model.VehicleType == VehicleType.ContainerCarrier)
+                    {
+                        <div class="col-md-4">
+                            <label class="form-label">Container Lift Capacity</label>
+                            <InputNumber class="form-control" @bind-Value="_model.ContainerLiftCapacity" />
+                        </div>
+                    }
+                    @if (_model.VehicleType is VehicleType.Bus or VehicleType.Van)
+                    {
+                        <div class="col-md-4">
+                            <label class="form-label">Seating Capacity</label>
+                            <InputNumber class="form-control" @bind-Value="_model.SeatingCapacity" />
+                        </div>
+                    }
+                </div>
+            </div></div>
+        }
+        else if (_activeTab == "Registration & Legal")
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Registration &amp; Legal Documents</h5>
+                <div class="row g-3">
+                    <div class="col-md-4"><label class="form-label">RC Number</label><InputText class="form-control" @bind-Value="_model.RCNumber" /></div>
+                    <div class="col-md-4"><label class="form-label">RC Expiry Date</label><InputDate class="form-control" @bind-Value="_model.RCExpiryDate" /></div>
+                    <div class="col-md-4"></div>
+
+                    <div class="col-md-4"><label class="form-label">Fitness Certificate No.</label><InputText class="form-control" @bind-Value="_model.FitnessCertificateNo" /></div>
+                    <div class="col-md-4"><label class="form-label">Fitness Expiry Date</label><InputDate class="form-control" @bind-Value="_model.FitnessExpiryDate" /></div>
+                    <div class="col-md-4"></div>
+
+                    <div class="col-md-4"><label class="form-label">Route Permit No.</label><InputText class="form-control" @bind-Value="_model.RoutePermitNo" /></div>
+                    <div class="col-md-4"><label class="form-label">Permit Expiry Date</label><InputDate class="form-control" @bind-Value="_model.PermitExpiryDate" /></div>
+                    <div class="col-md-4"></div>
+
+                    <div class="col-md-4"><label class="form-label">Insurance Policy No.</label><InputText class="form-control" @bind-Value="_model.InsurancePolicyNo" /></div>
+                    <div class="col-md-4"><label class="form-label">Insurance Provider</label><InputText class="form-control" @bind-Value="_model.InsuranceProvider" /></div>
+                    <div class="col-md-4"><label class="form-label">Insurance Expiry Date</label><InputDate class="form-control" @bind-Value="_model.InsuranceExpiryDate" /></div>
+
+                    <div class="col-md-4"><label class="form-label">Pollution/Emission Cert. No.</label><InputText class="form-control" @bind-Value="_model.PollutionCertNo" /></div>
+                    <div class="col-md-4"><label class="form-label">Pollution Cert. Expiry Date</label><InputDate class="form-control" @bind-Value="_model.PollutionCertExpiryDate" /></div>
+                    <div class="col-md-4"><label class="form-label">Tax Paid Till</label><InputDate class="form-control" @bind-Value="_model.TaxPaidTill" /></div>
+                </div>
+
+                @if (_detail is not null)
+                {
+                    <hr />
+                    <h6>Document Expiry Status</h6>
+                    <table class="table table-sm">
+                        <thead><tr><th>Document</th><th>Expiry</th><th>Days Remaining</th><th>Status</th></tr></thead>
+                        <tbody>
+                        @foreach (var s in _detail.DocumentExpiryStatuses)
+                        {
+                            <tr>
+                                <td>@s.Category.ToDisplayName()</td>
+                                <td>@(s.ExpiryDate?.ToString("dd-MMM-yyyy") ?? "—")</td>
+                                <td>@(s.DaysRemaining?.ToString() ?? "—")</td>
+                                <td>
+                                    @if (s.IsExpired)
+                                    {
+                                        <span class="badge bg-danger">Expired</span>
+                                    }
+                                    else if (s.IsExpiringSoon)
+                                    {
+                                        <span class="badge bg-warning text-dark">Expiring soon</span>
+                                    }
+                                    else if (s.ExpiryDate is not null)
+                                    {
+                                        <span class="badge bg-success">OK</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+
+                    <hr />
+                    <h6>Document Uploads</h6>
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Category</label>
+                            <select class="form-select" @bind="_uploadCategory">
+                                @foreach (var c in Enum.GetValues<DocumentCategory>())
+                                {
+                                    <option value="@c">@c.ToDisplayName()</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">File (PDF/JPG/PNG, max 10 MB)</label>
+                            <InputFile OnChange="UploadDocument" class="form-control" />
+                        </div>
+                    </div>
+                    <table class="table table-sm">
+                        <thead><tr><th>Category</th><th>File</th><th>Uploaded</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var d in _detail.Documents)
+                        {
+                            <tr>
+                                <td>@d.Category.ToDisplayName()</td>
+                                <td><a href="@d.DownloadUrl" target="_blank">@d.FileName</a></td>
+                                <td>@d.UploadedAt.ToLocalTime().ToString("dd-MMM-yyyy HH:mm")</td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteDocument(d.Id)"><i class="bi bi-trash"></i></button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </div></div>
+        }
+        else if (_activeTab == "Alerts & Notifications" && _detail is not null)
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Alerts &amp; Notifications</h5>
+                <p class="text-muted small">Configure an automatic alert for any document above, before it lapses.</p>
+
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Document</label>
+                        <select class="form-select" @bind="_newAlert.DocumentCategory">
+                            @foreach (var c in Enum.GetValues<DocumentCategory>())
+                            {
+                                <option value="@c">@c.ToDisplayName()</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Threshold (days)</label>
+                        <input type="number" class="form-control" @bind="_newAlert.ThresholdDays" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Notification Channel</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" @bind="_chEmail" id="chEmail" />
+                            <label class="form-check-label" for="chEmail">Email</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" @bind="_chInApp" id="chInApp" />
+                            <label class="form-check-label" for="chInApp">In-app</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" @bind="_chSms" id="chSms" />
+                            <label class="form-check-label" for="chSms">SMS</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Recipient / Role</label>
+                        <input class="form-control" @bind="_newAlert.RecipientRole" placeholder="Fleet manager..." />
+                    </div>
+                    <div class="col-md-1 d-grid">
+                        <button type="button" class="btn btn-primary" @onclick="AddAlert"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                </div>
+
+                <table class="table table-sm">
+                    <thead><tr><th>Document</th><th>Threshold</th><th>Channel</th><th>Recipient</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var a in _detail.AlertRules)
+                    {
+                        <tr>
+                            <td>@a.DocumentCategory.ToDisplayName()</td>
+                            <td>@a.ThresholdDays days</td>
+                            <td>@ChannelLabel(a.Channel)</td>
+                            <td>@a.RecipientRole</td>
+                            <td><span class="badge @AlertStatusClass(a.Status)">@a.Status.ToDisplayName()</span></td>
+                            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAlert(a.Id)"><i class="bi bi-trash"></i></button></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div></div>
+        }
+        else if (_activeTab == "Tyre Information" && _detail is not null)
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Tyre Information</h5>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Number of Tyres</label>
+                        <InputNumber class="form-control" @bind-Value="_model.NumberOfTyres" />
+                    </div>
+                </div>
+
+                <h6>Add Tyre</h6>
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-md-2">
+                        <label class="form-label">Position</label>
+                        <select class="form-select" @bind="_newTyre.Position">
+                            @foreach (var p in Enum.GetValues<TyrePosition>())
+                            {
+                                <option value="@p">@p.ToDisplayName()</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2"><label class="form-label">Brand &amp; Size</label><input class="form-control" @bind="_newTyre.BrandAndSize" /></div>
+                    <div class="col-md-2"><label class="form-label">Installed</label><input type="date" class="form-control" @bind="_newTyre.InstallationDate" /></div>
+                    <div class="col-md-2"><label class="form-label">Odometer</label><input type="number" class="form-control" @bind="_newTyre.InstallationOdometer" /></div>
+                    <div class="col-md-2"><label class="form-label">Condition</label><input class="form-control" @bind="_newTyre.CurrentCondition" placeholder="e.g. 7mm tread" /></div>
+                    <div class="col-md-1 d-grid"><button type="button" class="btn btn-primary" @onclick="AddTyre"><i class="bi bi-plus-lg"></i></button></div>
+                </div>
+
+                @foreach (var t in _detail.Tyres)
+                {
+                    <div class="border rounded p-2 mb-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>@t.Position.ToDisplayName()</strong>
+                                &mdash; @t.BrandAndSize
+                                <span class="text-muted small">
+                                    installed @(t.InstallationDate?.ToString("dd-MMM-yyyy") ?? "—"),
+                                    condition: @(t.CurrentCondition ?? "—"),
+                                    last rotated: @(t.LastRotationDate?.ToString("dd-MMM-yyyy") ?? "—")
+                                </span>
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleTyreHistory(t.Id)">
+                                    History (@t.ReplacementHistory.Count)
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTyre(t.Id)"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </div>
+
+                        @if (_expandedTyreId == t.Id)
+                        {
+                            <div class="mt-2 ps-2 border-start">
+                                <table class="table table-sm">
+                                    <thead><tr><th>Replaced</th><th>Odometer</th><th>Old</th><th>New</th><th>Reason</th></tr></thead>
+                                    <tbody>
+                                    @foreach (var r in t.ReplacementHistory)
+                                    {
+                                        <tr>
+                                            <td>@r.ReplacedDate.ToString("dd-MMM-yyyy")</td>
+                                            <td>@r.OdometerAtReplacement</td>
+                                            <td>@r.OldBrandAndSize</td>
+                                            <td>@r.NewBrandAndSize</td>
+                                            <td>@r.Reason</td>
+                                        </tr>
+                                    }
+                                    </tbody>
+                                </table>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-2"><label class="form-label">Replaced Date</label><input type="date" class="form-control" @bind="_newReplacement.ReplacedDate" /></div>
+                                    <div class="col-md-2"><label class="form-label">Odometer</label><input type="number" class="form-control" @bind="_newReplacement.OdometerAtReplacement" /></div>
+                                    <div class="col-md-2"><label class="form-label">Old Brand/Size</label><input class="form-control" @bind="_newReplacement.OldBrandAndSize" /></div>
+                                    <div class="col-md-2"><label class="form-label">New Brand/Size</label><input class="form-control" @bind="_newReplacement.NewBrandAndSize" /></div>
+                                    <div class="col-md-3"><label class="form-label">Reason</label><input class="form-control" @bind="_newReplacement.Reason" /></div>
+                                    <div class="col-md-1 d-grid"><button type="button" class="btn btn-primary" @onclick="() => AddReplacement(t.Id)"><i class="bi bi-plus-lg"></i></button></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div></div>
+        }
+        else if (_activeTab == "Maintenance & Service" && _detail is not null)
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Maintenance &amp; Service</h5>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3"><label class="form-label">Last Oil Change Date</label><InputDate class="form-control" @bind-Value="_model.LastOilChangeDate" /></div>
+                    <div class="col-md-3"><label class="form-label">Last Oil Change Odometer</label><InputNumber class="form-control" @bind-Value="_model.LastOilChangeOdometer" /></div>
+                    <div class="col-md-3"><label class="form-label">Next Oil Change Due Date</label><InputDate class="form-control" @bind-Value="_model.NextOilChangeDueDate" /></div>
+                    <div class="col-md-3"><label class="form-label">Next Oil Change Due Odometer</label><InputNumber class="form-control" @bind-Value="_model.NextOilChangeDueOdometer" /></div>
+
+                    <div class="col-md-3"><label class="form-label">Last Service Date</label><InputDate class="form-control" @bind-Value="_model.LastServiceDate" /></div>
+                    <div class="col-md-3"><label class="form-label">Service Interval (km)</label><InputNumber class="form-control" @bind-Value="_model.ServiceIntervalKm" /></div>
+                    <div class="col-md-3"><label class="form-label">Service Interval (months)</label><InputNumber class="form-control" @bind-Value="_model.ServiceIntervalMonths" /></div>
+                    <div class="col-md-3"><label class="form-label">Battery Replacement Date</label><InputDate class="form-control" @bind-Value="_model.BatteryReplacementDate" /></div>
+                </div>
+
+                <hr />
+                <h6>Service / Repair Log</h6>
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-md-2">
+                        <label class="form-label">Type</label>
+                        <select class="form-select" @bind="_newMaintenance.Type">
+                            @foreach (var t in Enum.GetValues<MaintenanceType>())
+                            {
+                                <option value="@t">@t.ToDisplayName()</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2"><label class="form-label">Date</label><input type="date" class="form-control" @bind="_newMaintenance.Date" /></div>
+                    <div class="col-md-2"><label class="form-label">Odometer</label><input type="number" class="form-control" @bind="_newMaintenance.Odometer" /></div>
+                    <div class="col-md-2"><label class="form-label">Vendor/Workshop</label><input class="form-control" @bind="_newMaintenance.ServiceVendor" /></div>
+                    <div class="col-md-2"><label class="form-label">Cost</label><input type="number" class="form-control" @bind="_newMaintenance.Cost" /></div>
+                    <div class="col-md-1 d-grid"><button type="button" class="btn btn-primary" @onclick="AddMaintenance"><i class="bi bi-plus-lg"></i></button></div>
+                    <div class="col-md-12"><label class="form-label">Description</label><input class="form-control" @bind="_newMaintenance.Description" /></div>
+                </div>
+
+                <table class="table table-sm">
+                    <thead><tr><th>Type</th><th>Date</th><th>Odometer</th><th>Vendor</th><th>Cost</th><th>Description</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var m in _detail.MaintenanceRecords)
+                    {
+                        <tr>
+                            <td>@m.Type.ToDisplayName()</td>
+                            <td>@m.Date.ToString("dd-MMM-yyyy")</td>
+                            <td>@m.Odometer</td>
+                            <td>@m.ServiceVendor</td>
+                            <td>@m.Cost</td>
+                            <td>@m.Description</td>
+                            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteMaintenance(m.Id)"><i class="bi bi-trash"></i></button></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div></div>
+        }
+        else if (_activeTab == "Operational Status")
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Operational Status</h5>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Current Status *</label>
+                        <InputSelect class="form-select" @bind-Value="_model.CurrentStatus">
+                            @foreach (var s in Enum.GetValues<OperationalStatus>())
+                            {
+                                <option value="@s">@s.ToDisplayName()</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-3"><label class="form-label">Current Location / Depot</label><InputText class="form-control" @bind-Value="_model.CurrentLocation" /></div>
+                    <div class="col-md-3"><label class="form-label">Assigned Driver</label><InputText class="form-control" @bind-Value="_model.AssignedDriver" placeholder="Driver Master coming soon" /></div>
+                    <div class="col-md-3"><label class="form-label">Current Booking / Trip Ref.</label><InputText class="form-control" @bind-Value="_model.CurrentBookingReference" /></div>
+                    <div class="col-md-3"><label class="form-label">Current Odometer Reading</label><InputNumber class="form-control" @bind-Value="_model.CurrentOdometerReading" /></div>
+                    <div class="col-md-3"><label class="form-label">Fuel Consumption Average</label><InputNumber class="form-control" @bind-Value="_model.FuelConsumptionAverage" /></div>
+                </div>
+            </div></div>
+
+            @if (_detail is not null)
+            {
+                <div class="card mt-3"><div class="card-body">
+                    <h5 class="card-title">Booking &amp; Utilization</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 text-center">
+                                <div class="text-muted small">Total Trips Completed</div>
+                                <div class="fs-4">@_detail.TotalTripsCompleted</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2 text-center">
+                                <div class="text-muted small">Utilization %</div>
+                                <div class="fs-4">@_detail.UtilizationPercent%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6>Add Booking / Trip</h6>
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-2"><label class="form-label">Trip Reference</label><input class="form-control" @bind="_newBooking.TripReference" /></div>
+                        <div class="col-md-2"><label class="form-label">Start Date</label><input type="date" class="form-control" @bind="_newBooking.StartDate" /></div>
+                        <div class="col-md-2"><label class="form-label">End Date</label><input type="date" class="form-control" @bind="_newBooking.EndDate" /></div>
+                        <div class="col-md-2">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" @bind="_newBooking.Status">
+                                @foreach (var s in Enum.GetValues<BookingStatus>())
+                                {
+                                    <option value="@s">@s.ToDisplayName()</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3"><label class="form-label">Notes</label><input class="form-control" @bind="_newBooking.Notes" /></div>
+                        <div class="col-md-1 d-grid"><button type="button" class="btn btn-primary" @onclick="AddBooking"><i class="bi bi-plus-lg"></i></button></div>
+                    </div>
+
+                    <table class="table table-sm">
+                        <thead><tr><th>Trip Ref.</th><th>Start</th><th>End</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var b in _detail.BookingRecords)
+                        {
+                            <tr>
+                                <td>@b.TripReference</td>
+                                <td>@b.StartDate.ToString("dd-MMM-yyyy")</td>
+                                <td>@(b.EndDate?.ToString("dd-MMM-yyyy") ?? "—")</td>
+                                <td><span class="badge @BookingStatusClass(b.Status)">@b.Status.ToDisplayName()</span></td>
+                                <td>@b.Notes</td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteBooking(b.Id)"><i class="bi bi-trash"></i></button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div></div>
+            }
+        }
+        else if (_activeTab == "Financials")
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Financials <span class="text-muted small">(optional)</span></h5>
+                <div class="row g-3">
+                    <div class="col-md-3"><label class="form-label">Purchase Price / Lease Value</label><InputNumber class="form-control" @bind-Value="_model.PurchasePrice" /></div>
+                    <div class="col-md-3"><label class="form-label">Depreciation Info</label><InputText class="form-control" @bind-Value="_model.DepreciationInfo" /></div>
+                    <div class="col-md-3"><label class="form-label">Running Cost per KM</label><InputNumber class="form-control" @bind-Value="_model.RunningCostPerKm" /></div>
+                    <div class="col-md-3"><label class="form-label">Fuel Cost Tracking</label><InputNumber class="form-control" @bind-Value="_model.FuelCostTracking" /></div>
+                </div>
+            </div></div>
+        }
+
+        <div class="mt-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@(IsNew ? "Create Vehicle" : "Save Changes")</button>
+            <a class="btn btn-outline-secondary" href="/fleet-vehicles">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool IsNew => Id is null;
+
+    private static readonly string[] Tabs =
+    {
+        "Vehicle Identity", "Registration & Legal", "Alerts & Notifications",
+        "Tyre Information", "Maintenance & Service", "Operational Status", "Financials"
+    };
+
+    private string _activeTab = "Vehicle Identity";
+    private bool _loading = true;
+    private string? _error;
+    private string? _message;
+
+    private VehicleUpsertDto _model = new();
+    private VehicleDetailDto? _detail;
+
+    private DocumentCategory _uploadCategory = DocumentCategory.RegistrationCertificate;
+
+    private AlertRuleUpsertDto _newAlert = new();
+    private bool _chEmail = true;
+    private bool _chInApp;
+    private bool _chSms;
+
+    private TyreUpsertDto _newTyre = new();
+    private int? _expandedTyreId;
+    private TyreReplacementHistoryUpsertDto _newReplacement = new();
+
+    private MaintenanceRecordUpsertDto _newMaintenance = new() { Date = DateOnly.FromDateTime(DateTime.Today) };
+
+    private BookingRecordUpsertDto _newBooking = new() { StartDate = DateOnly.FromDateTime(DateTime.Today) };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            if (Id.HasValue)
+            {
+                _detail = await Api.GetVehicleAsync(Id.Value);
+                if (_detail is null)
+                {
+                    _error = "Vehicle not found.";
+                }
+                else
+                {
+                    _model = _detail;
+                }
+            }
+            else
+            {
+                _detail = null;
+                _model = new VehicleUpsertDto();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load vehicle: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        _error = null;
+        _message = null;
+        try
+        {
+            if (IsNew)
+            {
+                var created = await Api.CreateVehicleAsync(_model);
+                Nav.NavigateTo($"/fleet-vehicles/{created.Id}/edit");
+            }
+            else
+            {
+                await Api.UpdateVehicleAsync(Id!.Value, _model);
+                _message = "Changes saved.";
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save vehicle: {ex.Message}";
+        }
+    }
+
+    // ----- Documents -----
+
+    private async Task UploadDocument(InputFileChangeEventArgs e)
+    {
+        if (_detail is null) return;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
+            await Api.UploadDocumentAsync(_detail.Id, _uploadCategory, e.File.Name, e.File.ContentType, stream);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to upload document: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteDocument(int documentId)
+    {
+        if (_detail is null) return;
+        try
+        {
+            await Api.DeleteDocumentAsync(_detail.Id, documentId);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete document: {ex.Message}";
+        }
+    }
+
+    // ----- Alerts -----
+
+    private async Task AddAlert()
+    {
+        if (_detail is null) return;
+        try
+        {
+            _newAlert.Channel = (_chEmail ? NotificationChannel.Email : 0)
+                | (_chInApp ? NotificationChannel.InApp : 0)
+                | (_chSms ? NotificationChannel.SMS : 0);
+            await Api.CreateAlertAsync(_detail.Id, _newAlert);
+            _newAlert = new();
+            _chEmail = true; _chInApp = false; _chSms = false;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add alert: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteAlert(int alertId)
+    {
+        if (_detail is null) return;
+        try
+        {
+            await Api.DeleteAlertAsync(_detail.Id, alertId);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete alert: {ex.Message}";
+        }
+    }
+
+    private static string ChannelLabel(NotificationChannel channel)
+    {
+        var parts = new List<string>();
+        if (channel.HasFlag(NotificationChannel.Email)) parts.Add("Email");
+        if (channel.HasFlag(NotificationChannel.InApp)) parts.Add("In-app");
+        if (channel.HasFlag(NotificationChannel.SMS)) parts.Add("SMS");
+        return parts.Count > 0 ? string.Join(", ", parts) : "None";
+    }
+
+    private static string AlertStatusClass(AlertStatus status) => status switch
+    {
+        AlertStatus.Pending => "bg-warning text-dark",
+        AlertStatus.Acknowledged => "bg-info text-dark",
+        AlertStatus.Resolved => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    // ----- Tyres -----
+
+    private async Task AddTyre()
+    {
+        if (_detail is null) return;
+        try
+        {
+            await Api.CreateTyreAsync(_detail.Id, _newTyre);
+            _newTyre = new();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add tyre: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteTyre(int tyreId)
+    {
+        if (_detail is null) return;
+        try
+        {
+            await Api.DeleteTyreAsync(_detail.Id, tyreId);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete tyre: {ex.Message}";
+        }
+    }
+
+    private void ToggleTyreHistory(int tyreId)
+    {
+        _expandedTyreId = _expandedTyreId == tyreId ? null : tyreId;
+    }
+
+    private async Task AddReplacement(int tyreId)
+    {
+        if (_detail is null) return;
+        try
+        {
+            await Api.AddTyreReplacementAsync(_detail.Id, tyreId, _newReplacement);
+            _newReplacement = new();
+            await LoadAsync();
+            _expandedTyreId = tyreId;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add replacement: {ex.Message}";
+        }
+    }
+
+    // ----- Maintenance -----
+
+    private async Task AddMaintenance()
+    {
+        if (_detail is null) return;
+        try
+        {
+            await Api.CreateMaintenanceRecordAsync(_detail.Id, _newMaintenance);
+            _newMaintenance = new() { Date = DateOnly.FromDateTime(DateTime.Today) };
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add maintenance record: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteMaintenance(int recordId)
+    {
+        if (_detail is null) return;
+        try
+        {
+            await Api.DeleteMaintenanceRecordAsync(_detail.Id, recordId);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete maintenance record: {ex.Message}";
+        }
+    }
+
+    // ----- Bookings -----
+
+    private async Task AddBooking()
+    {
+        if (_detail is null) return;
+        try
+        {
+            await Api.CreateBookingAsync(_detail.Id, _newBooking);
+            _newBooking = new() { StartDate = DateOnly.FromDateTime(DateTime.Today) };
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add booking: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteBooking(int bookingId)
+    {
+        if (_detail is null) return;
+        try
+        {
+            await Api.DeleteBookingAsync(_detail.Id, bookingId);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete booking: {ex.Message}";
+        }
+    }
+
+    private static string BookingStatusClass(BookingStatus status) => status switch
+    {
+        BookingStatus.Scheduled => "bg-secondary",
+        BookingStatus.Active => "bg-primary",
+        BookingStatus.Completed => "bg-success",
+        BookingStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

@@ -5,9 +5,9 @@ VisualStudioVersion = 17.14.36623.8
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TransportationSystemApi", "TransportationSystemApi\TransportationSystemApi.csproj", "{03572CBB-F8CA-46B0-9C33-0415C4B5CC72}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FleetMaster.Web", "..\FleetMaster.Web\FleetMaster.Web.csproj", "{32BA0013-C59F-4E33-8FC9-59D8C147F915}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TransportationSystemWeb", "..\TransportationSystemWeb\TransportationSystemWeb.csproj", "{32BA0013-C59F-4E33-8FC9-59D8C147F915}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FleetMaster.Shared", "..\FleetMaster.Shared\FleetMaster.Shared.csproj", "{195EC8E4-30F0-45C6-A485-032AF169EEB4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TransportationSystemShared", "..\TransportationSystemShared\TransportationSystemShared.csproj", "{195EC8E4-30F0-45C6-A485-032AF169EEB4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
