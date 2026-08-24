@@ -85,7 +85,7 @@ public enum MaintenanceType
     BatteryReplacement
 }
 
-public enum BookingStatus
+public enum TripStatus
 {
     Scheduled,
     Active,

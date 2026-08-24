@@ -53,9 +53,11 @@
             </div>
 
             <div class="nav-module">
-                <a class="nav-module-header coming-soon" href="/modules/coming-soon/trip-booking" title="Trip / Booking">
+                <div class="nav-module-header @(SubLinkClass("/trips") == "active" ? "active-module" : "")" title="Trip / Booking">
                     <i class="bi bi-calendar-check"></i> <span class="nav-text">Trip / Booking</span>
-                    <span class="badge bg-secondary ms-auto">Soon</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/trips")" href="/trips" title="Trip List">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Trip List</span>
                 </a>
             </div>
 

@@ -88,18 +88,18 @@ public static class VehicleMapper
             AlertRules = v.AlertRules.Select(ToDto).ToList(),
             Tyres = v.Tyres.Select(ToDto).ToList(),
             MaintenanceRecords = v.MaintenanceRecords.Select(ToDto).ToList(),
-            BookingRecords = v.BookingRecords.OrderByDescending(b => b.StartDate).Select(ToDto).ToList(),
+            Trips = v.Trips.OrderByDescending(t => t.StartDate).Select(TripMapper.ToListItemDto).ToList(),
         };
 
-        dto.TotalTripsCompleted = v.BookingRecords.Count(b => b.Status == BookingStatus.Completed);
-        var totalBookings = v.BookingRecords.Count(b => b.Status is BookingStatus.Completed or BookingStatus.Active);
-        dto.UtilizationPercent = v.BookingRecords.Count == 0
+        dto.TotalTripsCompleted = v.Trips.Count(t => t.Status == TripStatus.Completed);
+        var activeOrCompleted = v.Trips.Count(t => t.Status is TripStatus.Completed or TripStatus.Active);
+        dto.UtilizationPercent = v.Trips.Count == 0
             ? 0
-            : Math.Round(100.0 * totalBookings / v.BookingRecords.Count, 1);
-        dto.UpcomingBookings = v.BookingRecords
-            .Where(b => b.Status == BookingStatus.Scheduled)
-            .OrderBy(b => b.StartDate)
-            .Select(ToDto)
+            : Math.Round(100.0 * activeOrCompleted / v.Trips.Count, 1);
+        dto.UpcomingTrips = v.Trips
+            .Where(t => t.Status == TripStatus.Scheduled)
+            .OrderBy(t => t.StartDate)
+            .Select(TripMapper.ToListItemDto)
             .ToList();
 
         dto.DocumentExpiryStatuses = GetDocumentExpiries(v);
@@ -220,16 +220,6 @@ public static class VehicleMapper
         Description = m.Description,
         ServiceVendor = m.ServiceVendor,
         Cost = m.Cost
-    };
-
-    public static BookingRecordDto ToDto(BookingRecord b) => new()
-    {
-        Id = b.Id,
-        TripReference = b.TripReference,
-        StartDate = b.StartDate,
-        EndDate = b.EndDate,
-        Status = b.Status,
-        Notes = b.Notes
     };
 
     private static bool IsExpiringOrExpired(DateOnly expiry) =>

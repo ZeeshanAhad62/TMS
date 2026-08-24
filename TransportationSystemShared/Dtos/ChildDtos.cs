@@ -103,25 +103,3 @@ public class MaintenanceRecordUpsertDto
     public string? ServiceVendor { get; set; }
     public decimal? Cost { get; set; }
 }
-
-public class BookingRecordDto
-{
-    public int Id { get; set; }
-    public string TripReference { get; set; } = string.Empty;
-    public DateOnly StartDate { get; set; }
-    public DateOnly? EndDate { get; set; }
-    public BookingStatus Status { get; set; }
-    public string? Notes { get; set; }
-}
-
-public class BookingRecordUpsertDto
-{
-    [Required, MaxLength(50)]
-    public string TripReference { get; set; } = string.Empty;
-
-    [Required]
-    public DateOnly StartDate { get; set; }
-    public DateOnly? EndDate { get; set; }
-    public BookingStatus Status { get; set; } = BookingStatus.Scheduled;
-    public string? Notes { get; set; }
-}

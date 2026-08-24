@@ -252,19 +252,48 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
-    // ----- Bookings -----
+    // ----- Trips -----
 
-    public async Task CreateBookingAsync(int vehicleId, BookingRecordUpsertDto dto)
+    public async Task<List<TripListItemDto>> GetTripsAsync(int? vehicleId = null, int? driverId = null, TripStatus? status = null, string? search = null)
     {
         await AuthorizeAsync();
-        var response = await _http.PostAsJsonAsync($"api/vehicles/{vehicleId}/bookings", dto, JsonOptions);
+        var query = new List<string>();
+        if (vehicleId.HasValue) query.Add($"vehicleId={vehicleId}");
+        if (driverId.HasValue) query.Add($"driverId={driverId}");
+        if (status.HasValue) query.Add($"status={status}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+
+        return await _http.GetFromJsonAsync<List<TripListItemDto>>($"api/trips{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<TripDetailDto?> GetTripAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/trips/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<TripDetailDto>(JsonOptions);
+    }
+
+    public async Task<TripDetailDto> CreateTripAsync(TripUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/trips", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<TripDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateTripAsync(int id, TripUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/trips/{id}", dto, JsonOptions);
         await EnsureSuccess(response);
     }
 
-    public async Task DeleteBookingAsync(int vehicleId, int bookingId)
+    public async Task DeleteTripAsync(int id)
     {
         await AuthorizeAsync();
-        var response = await _http.DeleteAsync($"api/vehicles/{vehicleId}/bookings/{bookingId}");
+        var response = await _http.DeleteAsync($"api/trips/{id}");
         await EnsureSuccess(response);
     }
 

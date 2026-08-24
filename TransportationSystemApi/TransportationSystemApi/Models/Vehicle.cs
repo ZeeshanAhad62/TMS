@@ -77,5 +77,5 @@ public class Vehicle
     public List<AlertRule> AlertRules { get; set; } = new();
     public List<Tyre> Tyres { get; set; } = new();
     public List<MaintenanceRecord> MaintenanceRecords { get; set; } = new();
-    public List<BookingRecord> BookingRecords { get; set; } = new();
+    public List<Trip> Trips { get; set; } = new();
 }

@@ -8,11 +8,13 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
         <h2 class="mb-0">Overview</h2>
-        <div class="text-muted small">Fleet Management &rsaquo; Overview</div>
+        <div class="text-muted small">Dashboard &rsaquo; Overview</div>
     </div>
-    <a class="btn btn-primary" href="/fleet-vehicles">
-        <i class="bi bi-list-ul me-1"></i>Open Fleet Master
-    </a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="/fleet-vehicles"><i class="bi bi-truck me-1"></i>Fleet Master</a>
+        <a class="btn btn-outline-primary btn-sm" href="/drivers"><i class="bi bi-person-badge me-1"></i>Driver Master</a>
+        <a class="btn btn-outline-primary btn-sm" href="/trips"><i class="bi bi-calendar-check me-1"></i>Trip List</a>
+    </div>
 </div>
 
 @if (_error is not null)
@@ -20,13 +22,9 @@
     <div class="alert alert-danger">@_error</div>
 }
 
-@if (_vehicles is null)
+@if (_vehicles is null || _drivers is null || _trips is null)
 {
     <p><em>Loading...</em></p>
-}
-else if (_vehicles.Count == 0)
-{
-    <div class="alert alert-info">No vehicles yet. Add one from Fleet Master to see it reflected here.</div>
 }
 else
 {
@@ -191,10 +189,152 @@ else
             }
         </div>
     </div>
+
+    <hr class="my-4" />
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Total Drivers</div>
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-person-badge"></i></div>
+                            </div>
+                            <div class="stat-value">@TotalDrivers</div>
+                            <div class="stat-sub text-success"><i class="bi bi-check-circle me-1"></i>@ActiveDriverCount active</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Licenses Expiring</div>
+                                <div class="stat-icon bg-warning bg-opacity-25 text-warning-emphasis"><i class="bi bi-file-earmark-exclamation"></i></div>
+                            </div>
+                            <div class="stat-value">@LicenseExpiringCount</div>
+                            <div class="stat-sub text-muted">Within next 30 days</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">On Leave / Suspended</div>
+                                <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-person-dash"></i></div>
+                            </div>
+                            <div class="stat-value">@UnavailableDriverCount</div>
+                            <div class="stat-sub text-muted">Not currently active</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="mb-3">Upcoming License Expiries</h6>
+                    @if (!UpcomingLicenseExpiries.Any())
+                    {
+                        <div class="text-muted small">Nothing on the horizon.</div>
+                    }
+                    else
+                    {
+                        @foreach (var d in UpcomingLicenseExpiries)
+                        {
+                            <div class="side-list-row">
+                                <div class="side-list-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-person-badge"></i></div>
+                                <div class="flex-grow-1 text-truncate">
+                                    <div class="font-monospace small">@d.DriverCode</div>
+                                    <div class="text-muted" style="font-size:0.75rem;">@d.FullName</div>
+                                </div>
+                                <span class="badge @(d.HasExpiringDocument ? "bg-danger" : "bg-secondary")">@d.LicenseExpiryDate!.Value.ToString("dd-MMM-yyyy")</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-lg-8">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Total Trips</div>
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-calendar-check"></i></div>
+                            </div>
+                            <div class="stat-value">@TotalTrips</div>
+                            <div class="stat-sub text-muted">All time</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Active Trips</div>
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-play-circle"></i></div>
+                            </div>
+                            <div class="stat-value">@ActiveTripCount</div>
+                            <div class="stat-sub text-muted">On the road now</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Scheduled Trips</div>
+                                <div class="stat-icon bg-warning bg-opacity-25 text-warning-emphasis"><i class="bi bi-clock-history"></i></div>
+                            </div>
+                            <div class="stat-value">@ScheduledTripCount</div>
+                            <div class="stat-sub text-muted">Upcoming</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="mb-3">Upcoming Trips</h6>
+                    @if (!UpcomingTrips.Any())
+                    {
+                        <div class="text-muted small">Nothing scheduled.</div>
+                    }
+                    else
+                    {
+                        @foreach (var t in UpcomingTrips)
+                        {
+                            <div class="side-list-row">
+                                <div class="side-list-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-signpost-2"></i></div>
+                                <div class="flex-grow-1 text-truncate">
+                                    <div class="font-monospace small">@t.TripCode</div>
+                                    <div class="text-muted" style="font-size:0.75rem;">@t.Origin &rarr; @t.Destination</div>
+                                </div>
+                                <span class="badge bg-secondary">@t.StartDate.ToString("dd-MMM-yyyy")</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
 }
 
 @code {
     private List<VehicleListItemDto>? _vehicles;
+    private List<DriverListItemDto>? _drivers;
+    private List<TripListItemDto>? _trips;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -204,11 +344,15 @@ else
         try
         {
             _vehicles = await Api.GetVehiclesAsync();
+            _drivers = await Api.GetDriversAsync();
+            _trips = await Api.GetTripsAsync();
         }
         catch (Exception ex)
         {
             _error = $"Failed to load dashboard: {ex.Message}";
-            _vehicles = new();
+            _vehicles ??= new();
+            _drivers ??= new();
+            _trips ??= new();
         }
     }
 
@@ -241,6 +385,29 @@ else
     private int MaintenanceCount => _vehicles?.Count(v => v.CurrentStatus == OperationalStatus.UnderMaintenance) ?? 0;
     private int OutOfServiceCount => _vehicles?.Count(v => v.CurrentStatus == OperationalStatus.OutOfService) ?? 0;
     private int ExpiringCount => _vehicles?.Count(v => v.HasExpiringDocument) ?? 0;
+
+    private int TotalDrivers => _drivers?.Count ?? 0;
+    private int ActiveDriverCount => _drivers?.Count(d => d.Status == DriverStatus.Active) ?? 0;
+    private int UnavailableDriverCount => _drivers?.Count(d => d.Status is DriverStatus.OnLeave or DriverStatus.Suspended) ?? 0;
+    private int LicenseExpiringCount => _drivers?.Count(d => d.HasExpiringDocument) ?? 0;
+
+    private List<DriverListItemDto> UpcomingLicenseExpiries =>
+        (_drivers ?? new())
+            .Where(d => d.LicenseExpiryDate.HasValue)
+            .OrderBy(d => d.LicenseExpiryDate)
+            .Take(5)
+            .ToList();
+
+    private int TotalTrips => _trips?.Count ?? 0;
+    private int ActiveTripCount => _trips?.Count(t => t.Status == TripStatus.Active) ?? 0;
+    private int ScheduledTripCount => _trips?.Count(t => t.Status == TripStatus.Scheduled) ?? 0;
+
+    private List<TripListItemDto> UpcomingTrips =>
+        (_trips ?? new())
+            .Where(t => t.Status == TripStatus.Scheduled)
+            .OrderBy(t => t.StartDate)
+            .Take(5)
+            .ToList();
 
     private List<(OperationalStatus Status, int Count)> StatusCounts =>
         (_vehicles ?? new())

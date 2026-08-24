@@ -105,7 +105,7 @@ public class VehiclesController : ControllerBase
             .Include(v => v.AlertRules)
             .Include(v => v.Tyres).ThenInclude(t => t.ReplacementHistory)
             .Include(v => v.MaintenanceRecords)
-            .Include(v => v.BookingRecords)
+            .Include(v => v.Trips).ThenInclude(t => t.Driver)
             .AsSplitQuery()
             .FirstOrDefaultAsync(v => v.Id == id);
     }

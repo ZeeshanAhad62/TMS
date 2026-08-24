@@ -28,12 +28,12 @@ public class VehicleDetailDto : VehicleUpsertDto
     public List<AlertRuleDto> AlertRules { get; set; } = new();
     public List<TyreDto> Tyres { get; set; } = new();
     public List<MaintenanceRecordDto> MaintenanceRecords { get; set; } = new();
-    public List<BookingRecordDto> BookingRecords { get; set; } = new();
+    public List<TripListItemDto> Trips { get; set; } = new();
 
     // 3.7 Booking & Utilization - system-calculated
     public int TotalTripsCompleted { get; set; }
     public double UtilizationPercent { get; set; }
-    public List<BookingRecordDto> UpcomingBookings { get; set; } = new();
+    public List<TripListItemDto> UpcomingTrips { get; set; } = new();
 
     public List<DocumentExpiryStatusDto> DocumentExpiryStatuses { get; set; } = new();
 }

@@ -487,7 +487,12 @@ else
             @if (_detail is not null)
             {
                 <div class="card mt-3"><div class="card-body">
-                    <h5 class="card-title">Booking &amp; Utilization</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title">Booking &amp; Utilization</h5>
+                        <a class="btn btn-sm btn-outline-primary" href="/trips?VehicleId=@_detail.Id">
+                            <i class="bi bi-signpost-2 me-1"></i>Manage Trips for this Vehicle
+                        </a>
+                    </div>
                     <div class="row mb-3">
                         <div class="col-md-3">
                             <div class="border rounded p-2 text-center">
@@ -503,36 +508,19 @@ else
                         </div>
                     </div>
 
-                    <h6>Add Booking / Trip</h6>
-                    <div class="row g-2 align-items-end mb-3">
-                        <div class="col-md-2"><label class="form-label">Trip Reference</label><input class="form-control" @bind="_newBooking.TripReference" /></div>
-                        <div class="col-md-2"><label class="form-label">Start Date</label><input type="date" class="form-control" @bind="_newBooking.StartDate" /></div>
-                        <div class="col-md-2"><label class="form-label">End Date</label><input type="date" class="form-control" @bind="_newBooking.EndDate" /></div>
-                        <div class="col-md-2">
-                            <label class="form-label">Status</label>
-                            <select class="form-select" @bind="_newBooking.Status">
-                                @foreach (var s in Enum.GetValues<BookingStatus>())
-                                {
-                                    <option value="@s">@s.ToDisplayName()</option>
-                                }
-                            </select>
-                        </div>
-                        <div class="col-md-3"><label class="form-label">Notes</label><input class="form-control" @bind="_newBooking.Notes" /></div>
-                        <div class="col-md-1 d-grid"><button type="button" class="btn btn-primary" @onclick="AddBooking"><i class="bi bi-plus-lg"></i></button></div>
-                    </div>
-
+                    <h6>Trip History</h6>
                     <table class="table table-sm">
-                        <thead><tr><th>Trip Ref.</th><th>Start</th><th>End</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+                        <thead><tr><th>Trip Code</th><th>Driver</th><th>Route</th><th>Start</th><th>End</th><th>Status</th></tr></thead>
                         <tbody>
-                        @foreach (var b in _detail.BookingRecords)
+                        @foreach (var t in _detail.Trips)
                         {
                             <tr>
-                                <td>@b.TripReference</td>
-                                <td>@b.StartDate.ToString("dd-MMM-yyyy")</td>
-                                <td>@(b.EndDate?.ToString("dd-MMM-yyyy") ?? "—")</td>
-                                <td><span class="badge @BookingStatusClass(b.Status)">@b.Status.ToDisplayName()</span></td>
-                                <td>@b.Notes</td>
-                                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteBooking(b.Id)"><i class="bi bi-trash"></i></button></td>
+                                <td><a href="/trips/@t.Id/edit" class="font-monospace">@t.TripCode</a></td>
+                                <td>@t.DriverName</td>
+                                <td>@t.Origin &rarr; @t.Destination</td>
+                                <td>@t.StartDate.ToString("dd-MMM-yyyy")</td>
+                                <td>@(t.EndDate?.ToString("dd-MMM-yyyy") ?? "—")</td>
+                                <td><span class="badge @TripStatusClass(t.Status)">@t.Status.ToDisplayName()</span></td>
                             </tr>
                         }
                         </tbody>
@@ -591,8 +579,6 @@ else
     private TyreReplacementHistoryUpsertDto _newReplacement = new();
 
     private MaintenanceRecordUpsertDto _newMaintenance = new() { Date = DateOnly.FromDateTime(DateTime.Today) };
-
-    private BookingRecordUpsertDto _newBooking = new() { StartDate = DateOnly.FromDateTime(DateTime.Today) };
 
     protected override async Task OnParametersSetAsync()
     {
@@ -823,43 +809,12 @@ else
         }
     }
 
-    // ----- Bookings -----
-
-    private async Task AddBooking()
+    private static string TripStatusClass(TripStatus status) => status switch
     {
-        if (_detail is null) return;
-        try
-        {
-            await Api.CreateBookingAsync(_detail.Id, _newBooking);
-            _newBooking = new() { StartDate = DateOnly.FromDateTime(DateTime.Today) };
-            await LoadAsync();
-        }
-        catch (Exception ex)
-        {
-            _error = $"Failed to add booking: {ex.Message}";
-        }
-    }
-
-    private async Task DeleteBooking(int bookingId)
-    {
-        if (_detail is null) return;
-        try
-        {
-            await Api.DeleteBookingAsync(_detail.Id, bookingId);
-            await LoadAsync();
-        }
-        catch (Exception ex)
-        {
-            _error = $"Failed to delete booking: {ex.Message}";
-        }
-    }
-
-    private static string BookingStatusClass(BookingStatus status) => status switch
-    {
-        BookingStatus.Scheduled => "bg-secondary",
-        BookingStatus.Active => "bg-primary",
-        BookingStatus.Completed => "bg-success",
-        BookingStatus.Cancelled => "bg-danger",
+        TripStatus.Scheduled => "bg-secondary",
+        TripStatus.Active => "bg-primary",
+        TripStatus.Completed => "bg-success",
+        TripStatus.Cancelled => "bg-danger",
         _ => "bg-secondary"
     };
 }

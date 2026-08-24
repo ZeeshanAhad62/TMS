@@ -1,0 +1,162 @@
+@page "/trips"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Trip / Booking</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Trip / Booking</h2>
+        <div class="text-muted small">Trip / Booking &rsaquo; Trip List</div>
+    </div>
+    <a class="btn btn-primary" href="/trips/new">
+        <i class="bi bi-plus-lg me-1"></i>Add Trip
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <input class="form-control" placeholder="Search trip code, origin, destination..."
+                       @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_vehicleFilter">
+                    <option value="">All vehicles</option>
+                    @foreach (var v in _vehicles)
+                    {
+                        <option value="@v.Id">@v.VehicleCode &mdash; @v.RegistrationNumber</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_statusFilter">
+                    <option value="">All statuses</option>
+                    @foreach (var s in Enum.GetValues<TripStatus>())
+                    {
+                        <option value="@s">@s.ToDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3 d-grid">
+                <button class="btn btn-outline-secondary" @onclick="Load">
+                    <i class="bi bi-funnel me-1"></i>Apply
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_trips is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_trips.Count == 0)
+{
+    <div class="alert alert-info">No trips found. Click "Add Trip" to create the first one.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Trip Code</th><th>Vehicle</th><th>Driver</th><th>Route</th><th>Start</th><th>End</th><th>Status</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in _trips)
+                {
+                    <tr>
+                        <td class="font-monospace">@t.TripCode</td>
+                        <td>@t.VehicleCode &mdash; @t.VehicleRegistrationNumber</td>
+                        <td>@t.DriverName</td>
+                        <td>@t.Origin &rarr; @t.Destination</td>
+                        <td>@t.StartDate.ToString("dd-MMM-yyyy")</td>
+                        <td>@(t.EndDate?.ToString("dd-MMM-yyyy") ?? "—")</td>
+                        <td><span class="badge @StatusBadgeClass(t.Status)">@t.Status.ToDisplayName()</span></td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/trips/@t.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(t.Id)" title="Delete trip">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public int? VehicleId { get; set; }
+
+    private List<TripListItemDto>? _trips;
+    private List<VehicleListItemDto> _vehicles = new();
+    private string _search = "";
+    private string _vehicleFilter = "";
+    private string _statusFilter = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (VehicleId.HasValue) _vehicleFilter = VehicleId.Value.ToString();
+        _vehicles = await Api.GetVehiclesAsync();
+        await Load();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            int? vehicleId = string.IsNullOrEmpty(_vehicleFilter) ? null : int.Parse(_vehicleFilter);
+            TripStatus? status = string.IsNullOrEmpty(_statusFilter) ? null : Enum.Parse<TripStatus>(_statusFilter);
+            _trips = await Api.GetTripsAsync(vehicleId, null, status, _search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load trips: {ex.Message}";
+            _trips = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Delete this trip?");
+        if (!confirmed) return;
+
+        try
+        {
+            await Api.DeleteTripAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete trip: {ex.Message}";
+        }
+    }
+
+    private static string StatusBadgeClass(TripStatus status) => status switch
+    {
+        TripStatus.Scheduled => "bg-secondary",
+        TripStatus.Active => "bg-primary",
+        TripStatus.Completed => "bg-success",
+        TripStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+}
