@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TransportationSystemApi.Data;
@@ -14,7 +13,6 @@ namespace TransportationSystemApi.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly FleetDbContext _db;
-    private readonly PasswordHasher<User> _passwordHasher = new();
 
     public UsersController(FleetDbContext db)
     {
@@ -40,11 +38,11 @@ public class UsersController : ControllerBase
         {
             Username = dto.Username,
             Email = dto.Email,
+            Password = dto.Password,
             FullName = dto.FullName,
             Role = dto.Role,
             IsActive = true
         };
-        user.PasswordHash = _passwordHasher.HashPassword(user, dto.Password);
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync();

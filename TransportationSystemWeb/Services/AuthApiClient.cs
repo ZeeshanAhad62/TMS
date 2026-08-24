@@ -22,9 +22,17 @@ public class AuthApiClient
         _http = http;
     }
 
-    public async Task<LoginResponseDto?> LoginAsync(string username, string password)
+    public async Task<LoginResponseDto?> LoginAsync(string username, string password, string? ipAddress, string? deviceId, string? userAgent)
     {
-        var response = await _http.PostAsJsonAsync("api/auth/login", new LoginRequestDto { Username = username, Password = password }, JsonOptions);
+        var dto = new LoginRequestDto
+        {
+            Username = username,
+            Password = password,
+            IpAddress = ipAddress,
+            DeviceId = deviceId,
+            UserAgent = userAgent
+        };
+        var response = await _http.PostAsJsonAsync("api/auth/login", dto, JsonOptions);
         if (!response.IsSuccessStatusCode) return null;
         return await response.Content.ReadFromJsonAsync<LoginResponseDto>(JsonOptions);
     }

@@ -1,13 +1,300 @@
 @page "/"
 @attribute [Authorize]
+@inject FleetApiClient Api
+@inject IJSRuntime JS
 
-<PageTitle>Dashboard - Transportation Management System</PageTitle>
+<PageTitle>Overview - Transportation Management System</PageTitle>
 
-<div class="text-center py-5">
-    <i class="bi bi-truck" style="font-size:3.5rem;"></i>
-    <h2 class="mt-3">Welcome</h2>
-    <p class="text-muted">Fleet Management &rsaquo; Fleet Setup &rsaquo; Fleet Master</p>
-    <a class="btn btn-primary btn-lg mt-3" href="/fleet-vehicles">
-        <i class="bi bi-list-ul me-1"></i> Open Fleet Master
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Overview</h2>
+        <div class="text-muted small">Fleet Management &rsaquo; Overview</div>
+    </div>
+    <a class="btn btn-primary" href="/fleet-vehicles">
+        <i class="bi bi-list-ul me-1"></i>Open Fleet Master
     </a>
 </div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_vehicles is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_vehicles.Count == 0)
+{
+    <div class="alert alert-info">No vehicles yet. Add one from Fleet Master to see it reflected here.</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Total Vehicles</div>
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-truck"></i></div>
+                            </div>
+                            <div class="stat-value">@TotalVehicles</div>
+                            <div class="stat-sub text-success"><i class="bi bi-check-circle me-1"></i>@AvailableCount available</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Documents Expiring</div>
+                                <div class="stat-icon bg-warning bg-opacity-25 text-warning-emphasis"><i class="bi bi-file-earmark-exclamation"></i></div>
+                            </div>
+                            <div class="stat-value">@ExpiringCount</div>
+                            <div class="stat-sub text-muted">Within next 30 days</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Under Maintenance</div>
+                                <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-tools"></i></div>
+                            </div>
+                            <div class="stat-value">@MaintenanceCount</div>
+                            <div class="stat-sub text-muted">@OutOfServiceCount out of service</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                    <div class="card chart-card h-100">
+                        <div class="card-body">
+                            <h6 class="mb-2">Fleet by Status</h6>
+                            <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card chart-card h-100">
+                        <div class="card-body">
+                            <h6 class="mb-2">Fleet by Type</h6>
+                            <div class="chart-wrap"><canvas id="typeChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6 class="mb-3">Fleet by Location</h6>
+                    @if (!TopLocations.Any())
+                    {
+                        <div class="text-muted small">No location data recorded yet.</div>
+                    }
+                    else
+                    {
+                        @foreach (var (location, count) in TopLocations)
+                        {
+                            <div class="side-list-row">
+                                <div class="side-list-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-geo-alt"></i></div>
+                                <div class="flex-grow-1 text-truncate">@location</div>
+                                <span class="badge bg-light text-dark border">@count</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="mb-3">Upcoming Expiries</h6>
+                    @if (!UpcomingExpiries.Any())
+                    {
+                        <div class="text-muted small">Nothing on the horizon.</div>
+                    }
+                    else
+                    {
+                        @foreach (var v in UpcomingExpiries)
+                        {
+                            <div class="side-list-row">
+                                <div class="side-list-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-file-earmark-text"></i></div>
+                                <div class="flex-grow-1 text-truncate">
+                                    <div class="font-monospace small">@v.VehicleCode</div>
+                                    <div class="text-muted" style="font-size:0.75rem;">@v.RegistrationNumber</div>
+                                </div>
+                                <span class="badge @ExpiryBadgeClass(v)">@ExpiryBadgeText(v)</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 class="mb-0">Document Expiry Tracker</h6>
+                    <div class="text-muted small">Registration, fitness, permit, insurance, pollution &amp; road tax</div>
+                </div>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn @(!_showExpiringOnly ? "btn-primary" : "btn-outline-secondary")" @onclick="() => _showExpiringOnly = false">All</button>
+                    <button type="button" class="btn @(_showExpiringOnly ? "btn-primary" : "btn-outline-secondary")" @onclick="() => _showExpiringOnly = true">Expiring Only</button>
+                </div>
+            </div>
+
+            @if (ExpiryTrackerRows.Count == 0)
+            {
+                <div class="text-muted small">No documents with an expiry date on file.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Vehicle Code</th>
+                                <th>Registration No.</th>
+                                <th>Type</th>
+                                <th>Nearest Expiry</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var v in ExpiryTrackerRows)
+                            {
+                                <tr>
+                                    <td><span class="font-monospace">@v.VehicleCode</span></td>
+                                    <td>@v.RegistrationNumber</td>
+                                    <td>@v.VehicleType.ToDisplayName()</td>
+                                    <td>@v.NearestDocumentExpiry!.Value.ToString("dd-MMM-yyyy")</td>
+                                    <td><span class="badge @ExpiryBadgeClass(v)">@ExpiryBadgeText(v)</span></td>
+                                    <td class="text-end">
+                                        <a class="btn btn-sm btn-outline-primary" href="/fleet-vehicles/@v.Id/edit">
+                                            <i class="bi bi-pencil-square"></i> Open
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<VehicleListItemDto>? _vehicles;
+    private string? _error;
+    private bool _showExpiringOnly;
+    private bool _chartsRendered;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _vehicles = await Api.GetVehiclesAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load dashboard: {ex.Message}";
+            _vehicles = new();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_vehicles is { Count: > 0 } && !_chartsRendered)
+        {
+            _chartsRendered = true;
+            await RenderChartsAsync();
+        }
+    }
+
+    private async Task RenderChartsAsync()
+    {
+        var statusData = StatusCounts.ToList();
+        await JS.InvokeVoidAsync("renderBarChart", "statusChart",
+            statusData.Select(x => x.Status.ToDisplayName()).ToArray(),
+            statusData.Select(x => x.Count).ToArray(),
+            "#3a6df0");
+
+        var typeData = TypeCounts.ToList();
+        await JS.InvokeVoidAsync("renderBarChart", "typeChart",
+            typeData.Select(x => x.Type.ToDisplayName()).ToArray(),
+            typeData.Select(x => x.Count).ToArray(),
+            "#22c3a6");
+    }
+
+    private int TotalVehicles => _vehicles?.Count ?? 0;
+    private int AvailableCount => _vehicles?.Count(v => v.CurrentStatus == OperationalStatus.Available) ?? 0;
+    private int MaintenanceCount => _vehicles?.Count(v => v.CurrentStatus == OperationalStatus.UnderMaintenance) ?? 0;
+    private int OutOfServiceCount => _vehicles?.Count(v => v.CurrentStatus == OperationalStatus.OutOfService) ?? 0;
+    private int ExpiringCount => _vehicles?.Count(v => v.HasExpiringDocument) ?? 0;
+
+    private List<(OperationalStatus Status, int Count)> StatusCounts =>
+        (_vehicles ?? new())
+            .GroupBy(v => v.CurrentStatus)
+            .Select(g => (g.Key, g.Count()))
+            .OrderByDescending(x => x.Item2)
+            .ToList();
+
+    private List<(VehicleType Type, int Count)> TypeCounts =>
+        (_vehicles ?? new())
+            .GroupBy(v => v.VehicleType)
+            .Select(g => (g.Key, g.Count()))
+            .OrderByDescending(x => x.Item2)
+            .ToList();
+
+    private List<(string Location, int Count)> TopLocations =>
+        (_vehicles ?? new())
+            .Where(v => !string.IsNullOrWhiteSpace(v.CurrentLocation))
+            .GroupBy(v => v.CurrentLocation!)
+            .Select(g => (g.Key, g.Count()))
+            .OrderByDescending(x => x.Item2)
+            .Take(5)
+            .ToList();
+
+    private List<VehicleListItemDto> UpcomingExpiries =>
+        (_vehicles ?? new())
+            .Where(v => v.NearestDocumentExpiry.HasValue)
+            .OrderBy(v => v.NearestDocumentExpiry)
+            .Take(5)
+            .ToList();
+
+    private List<VehicleListItemDto> ExpiryTrackerRows =>
+        (_showExpiringOnly
+            ? (_vehicles ?? new()).Where(v => v.HasExpiringDocument)
+            : (_vehicles ?? new()).Where(v => v.NearestDocumentExpiry.HasValue))
+            .OrderBy(v => v.NearestDocumentExpiry)
+            .ToList();
+
+    private static int DaysRemaining(VehicleListItemDto v) =>
+        v.NearestDocumentExpiry!.Value.DayNumber - DateOnly.FromDateTime(DateTime.UtcNow).DayNumber;
+
+    private static string ExpiryBadgeClass(VehicleListItemDto v)
+    {
+        var days = DaysRemaining(v);
+        if (days < 0) return "bg-danger";
+        if (days <= 30) return "bg-warning text-dark";
+        return "bg-success";
+    }
+
+    private static string ExpiryBadgeText(VehicleListItemDto v)
+    {
+        var days = DaysRemaining(v);
+        if (days < 0) return "Expired";
+        if (days <= 30) return $"{days}d left";
+        return "OK";
+    }
+}

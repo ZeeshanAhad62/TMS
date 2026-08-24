@@ -1,0 +1,96 @@
+@page "/settings/login-history"
+@attribute [Authorize(Roles = "Admin")]
+@inject FleetApiClient Api
+
+<PageTitle>Login History - Settings</PageTitle>
+
+<div class="mb-3">
+    <h2 class="mb-0">Login History</h2>
+    <div class="text-muted small">Settings &rsaquo; Login History</div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_history is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_history.Count == 0)
+{
+    <div class="alert alert-info">No login attempts recorded yet.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover table-sm bg-white align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>When</th>
+                    <th>Username</th>
+                    <th>Result</th>
+                    <th>IP Address</th>
+                    <th>Device</th>
+                    <th>Browser / OS</th>
+                    <th>Location</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var h in _history)
+                {
+                    <tr>
+                        <td>@h.LoginAt.ToLocalTime().ToString("dd-MMM-yyyy HH:mm:ss")</td>
+                        <td>@h.AttemptedUsername</td>
+                        <td>
+                            @if (h.IsSuccessful)
+                            {
+                                <span class="badge bg-success">Success</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger">Failed</span>
+                            }
+                        </td>
+                        <td>@(h.IpAddress ?? "—")</td>
+                        <td><span class="font-monospace small">@(h.DeviceId is null ? "—" : h.DeviceId[..Math.Min(8, h.DeviceId.Length)])</span></td>
+                        <td>@FormatBrowserOs(h)</td>
+                        <td>@FormatLocation(h)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<LoginHistoryDto>? _history;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _history = await Api.GetLoginHistoryAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load login history: {ex.Message}";
+            _history = new();
+        }
+    }
+
+    private static string FormatBrowserOs(LoginHistoryDto h)
+    {
+        if (h.Browser is null && h.OperatingSystem is null) return "—";
+        return $"{h.Browser ?? "Unknown"} / {h.OperatingSystem ?? "Unknown"}";
+    }
+
+    private static string FormatLocation(LoginHistoryDto h)
+    {
+        var parts = new[] { h.City, h.Region, h.Country }.Where(p => !string.IsNullOrWhiteSpace(p));
+        var joined = string.Join(", ", parts);
+        return string.IsNullOrEmpty(joined) ? "—" : joined;
+    }
+}

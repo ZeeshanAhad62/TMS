@@ -1,0 +1,161 @@
+@page "/drivers"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Driver Master</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Driver Master</h2>
+        <div class="text-muted small">Driver Management &rsaquo; Driver Master</div>
+    </div>
+    <a class="btn btn-primary" href="/drivers/new">
+        <i class="bi bi-plus-lg me-1"></i>Add Driver
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-6">
+                <input class="form-control" placeholder="Search name, code, license number..."
+                       @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+            </div>
+            <div class="col-md-4">
+                <select class="form-select" @bind="_statusFilter">
+                    <option value="">All statuses</option>
+                    @foreach (var s in Enum.GetValues<DriverStatus>())
+                    {
+                        <option value="@s">@s.ToDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-outline-secondary" @onclick="Load">
+                    <i class="bi bi-funnel me-1"></i>Apply
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_drivers is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_drivers.Count == 0)
+{
+    <div class="alert alert-info">No drivers found. Click "Add Driver" to create the first Driver Master record.</div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var d in _drivers)
+        {
+            <div class="col-sm-6 col-lg-4 col-xl-3">
+                <div class="card driver-card h-100">
+                    <div class="driver-card-header">
+                        <i class="bi bi-person-badge driver-card-icon"></i>
+                        <span class="badge @StatusBadgeClass(d.Status) driver-card-status">@d.Status.ToDisplayName()</span>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title mb-0 font-monospace">@d.DriverCode</h5>
+                        <div class="text-muted small mb-2">@d.FullName</div>
+
+                        <div class="driver-card-row">
+                            <i class="bi bi-telephone text-muted"></i>
+                            <span>@d.PhoneNumber</span>
+                        </div>
+                        <div class="driver-card-row">
+                            <i class="bi bi-card-text text-muted"></i>
+                            <span>@d.LicenseNumber</span>
+                        </div>
+                        <div class="driver-card-row mb-3">
+                            <i class="bi bi-file-earmark-text text-muted"></i>
+                            @if (d.LicenseExpiryDate is not null)
+                            {
+                                <span class="badge @(d.HasExpiringDocument ? "bg-danger" : "bg-secondary")">
+                                    License expires @d.LicenseExpiryDate.Value.ToString("dd-MMM-yyyy")
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">No license expiry on file</span>
+                            }
+                        </div>
+
+                        <div class="mt-auto d-flex gap-2">
+                            <a class="btn btn-sm btn-outline-primary flex-fill" href="/drivers/@d.Id/edit">
+                                <i class="bi bi-pencil-square"></i> Open
+                            </a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(d.Id)" title="Delete driver">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<DriverListItemDto>? _drivers;
+    private string _search = "";
+    private string _statusFilter = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            DriverStatus? status = string.IsNullOrEmpty(_statusFilter) ? null : Enum.Parse<DriverStatus>(_statusFilter);
+            _drivers = await Api.GetDriversAsync(_search, status);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load drivers: {ex.Message}";
+            _drivers = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Delete this driver and all their Driver Master records?");
+        if (!confirmed) return;
+
+        try
+        {
+            await Api.DeleteDriverAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete driver: {ex.Message}";
+        }
+    }
+
+    private static string StatusBadgeClass(DriverStatus status) => status switch
+    {
+        DriverStatus.Active => "bg-success",
+        DriverStatus.OnLeave => "bg-warning text-dark",
+        DriverStatus.Suspended => "bg-danger",
+        DriverStatus.Inactive => "bg-secondary",
+        _ => "bg-secondary"
+    };
+}

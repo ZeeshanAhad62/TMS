@@ -99,3 +99,27 @@ public enum UserRole
     FleetManager,
     Viewer
 }
+
+public enum DriverStatus
+{
+    Active,
+    OnLeave,
+    Suspended,
+    Inactive
+}
+
+public enum DriverDocumentCategory
+{
+    DrivingLicense,
+    MedicalCertificate,
+    PoliceVerification,
+    IdProof,
+    Other
+}
+
+public enum AssignmentStatus
+{
+    Active,
+    Completed,
+    Cancelled
+}

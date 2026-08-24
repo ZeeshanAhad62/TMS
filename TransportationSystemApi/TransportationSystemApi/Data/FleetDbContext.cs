@@ -18,6 +18,10 @@ public class FleetDbContext : DbContext
     public DbSet<BookingRecord> BookingRecords => Set<BookingRecord>();
     public DbSet<User> Users => Set<User>();
     public DbSet<CompanyProfile> CompanyProfiles => Set<CompanyProfile>();
+    public DbSet<LoginHistory> LoginHistories => Set<LoginHistory>();
+    public DbSet<Driver> Drivers => Set<Driver>();
+    public DbSet<DriverDocument> DriverDocuments => Set<DriverDocument>();
+    public DbSet<DriverVehicleAssignment> DriverVehicleAssignments => Set<DriverVehicleAssignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +32,15 @@ public class FleetDbContext : DbContext
         });
 
         modelBuilder.Entity<CompanyProfile>().ToTable("CompanyProfile");
+
+        modelBuilder.Entity<LoginHistory>(entity =>
+        {
+            entity.ToTable("LoginHistory");
+            entity.HasOne(h => h.User)
+                .WithMany()
+                .HasForeignKey(h => h.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
 
         modelBuilder.Entity<Vehicle>(entity =>
         {
@@ -89,6 +102,30 @@ public class FleetDbContext : DbContext
         {
             entity.Property(m => m.Odometer).HasPrecision(18, 2);
             entity.Property(m => m.Cost).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<Driver>(entity =>
+        {
+            entity.HasIndex(d => d.DriverCode).IsUnique();
+            entity.HasIndex(d => d.LicenseNumber).IsUnique();
+
+            entity.HasMany(d => d.Documents)
+                .WithOne(doc => doc.Driver)
+                .HasForeignKey(doc => doc.DriverId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(d => d.Assignments)
+                .WithOne(a => a.Driver)
+                .HasForeignKey(a => a.DriverId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DriverVehicleAssignment>(entity =>
+        {
+            entity.HasOne(a => a.Vehicle)
+                .WithMany()
+                .HasForeignKey(a => a.VehicleId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

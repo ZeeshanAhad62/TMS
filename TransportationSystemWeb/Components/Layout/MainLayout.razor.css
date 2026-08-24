@@ -6,42 +6,79 @@
 .app-sidebar {
     width: 260px;
     flex-shrink: 0;
-    background: #1e2530;
+    background: linear-gradient(180deg, #1e2530 0%, #171c25 100%);
     color: #dfe3ea;
     display: flex;
     flex-direction: column;
+    transition: width 0.2s ease;
 }
 
 .sidebar-brand {
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    padding: 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1.1rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
+
+.sidebar-brand-link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-grow: 1;
+    min-width: 0;
+    text-decoration: none;
+    color: inherit;
+}
+
+    .sidebar-brand-link:hover .company-name {
+        text-decoration: underline;
+    }
 
 .sidebar-logo {
     max-height: 36px;
     max-width: 36px;
     object-fit: contain;
-    border-radius: 4px;
+    border-radius: 6px;
     background: #fff;
 }
 
 .sidebar-logo-icon {
     font-size: 1.6rem;
+    color: #6ea8fe;
 }
 
-.sidebar-brand-text .company-name {
-    font-weight: 600;
-    font-size: 0.95rem;
-    line-height: 1.1;
+.sidebar-brand-text {
+    min-width: 0;
+    flex-grow: 1;
 }
 
-.sidebar-brand-text .system-name {
-    font-size: 0.7rem;
+    .sidebar-brand-text .company-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .sidebar-brand-text .system-name {
+        font-size: 0.7rem;
+        color: #8b96a6;
+    }
+
+.sidebar-close {
+    background: none;
+    border: none;
     color: #9aa4b2;
+    font-size: 1.1rem;
+    padding: 0.25rem 0.5rem;
+    line-height: 1;
 }
+
+    .sidebar-close:hover {
+        color: #fff;
+    }
 
 .sidebar-nav {
     padding: 0.75rem 0.5rem;
@@ -49,28 +86,38 @@
     flex-grow: 1;
 }
 
+    .sidebar-nav::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .sidebar-nav::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 3px;
+    }
+
 .nav-section-label {
     text-transform: uppercase;
     font-size: 0.7rem;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     color: #7c8798;
-    padding: 0.5rem 0.75rem 0.25rem;
+    padding: 0.5rem 0.75rem 0.35rem;
 }
 
 .nav-module {
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.15rem;
 }
 
 .nav-module-header {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.55rem 0.75rem;
-    border-radius: 6px;
+    gap: 0.55rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
     font-weight: 600;
     font-size: 0.9rem;
     color: #dfe3ea;
     text-decoration: none;
+    transition: background-color 0.15s ease;
 }
 
 .nav-module-header.active-module {
@@ -83,19 +130,33 @@
 }
 
     .nav-module-header.coming-soon:hover {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(255, 255, 255, 0.06);
         color: #dfe3ea;
     }
+
+a.nav-module-header:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.nav-module-header.active {
+    background: #3a6df0;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(58, 109, 240, 0.35);
+}
 
 .nav-sublink {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 0.75rem 0.45rem 2rem;
-    border-radius: 6px;
+    gap: 0.55rem;
+    padding: 0.5rem 0.75rem 0.5rem 2rem;
+    margin: 0.05rem 0;
+    border-radius: 8px;
     font-size: 0.85rem;
     color: #b7c0cc;
     text-decoration: none;
+    position: relative;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
     .nav-sublink:hover {
@@ -106,7 +167,21 @@
     .nav-sublink.active {
         background: #3a6df0;
         color: #fff;
+        box-shadow: 0 2px 8px rgba(58, 109, 240, 0.35);
     }
+
+.sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 18, 24, 0.55);
+    z-index: 1040;
+    animation: fade-in 0.15s ease;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
 
 .app-main {
     flex-grow: 1;
@@ -118,14 +193,42 @@
 .app-topbar {
     display: flex;
     align-items: center;
+    gap: 0.75rem;
     justify-content: space-between;
-    padding: 0.75rem 1.25rem;
+    padding: 0.7rem 1.25rem;
     background: #fff;
     border-bottom: 1px solid #e5e7eb;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
+
+.sidebar-toggle {
+    background: none;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    color: #333;
+    font-size: 1.1rem;
+    padding: 0.25rem 0.55rem;
+    line-height: 1.4;
+}
+
+    .sidebar-toggle:hover {
+        background: #f5f6f8;
+    }
 
 .topbar-title {
     font-weight: 600;
+    flex-grow: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.topbar-user .badge {
+    font-weight: 500;
 }
 
 .app-content {
@@ -152,3 +255,66 @@
         right: 0.75rem;
         top: 0.5rem;
     }
+
+/* ---- Responsive: collapse sidebar to an off-canvas panel below 992px ---- */
+@media (max-width: 991.98px) {
+    .app-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 1050;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        box-shadow: 4px 0 16px rgba(0, 0, 0, 0.2);
+    }
+
+        .app-sidebar.open {
+            transform: translateX(0);
+        }
+
+    .app-topbar {
+        padding: 0.6rem 0.85rem;
+    }
+
+    .app-content {
+        padding: 0.85rem;
+    }
+}
+
+@media (min-width: 992px) {
+    .sidebar-close {
+        display: none;
+    }
+
+    .app-sidebar.collapsed {
+        flex: 0 0 76px;
+        width: 76px;
+        min-width: 76px;
+        overflow: hidden;
+    }
+
+        .app-sidebar.collapsed .sidebar-brand {
+            padding-left: 0.85rem;
+            padding-right: 0.85rem;
+        }
+
+        .app-sidebar.collapsed .sidebar-brand-text,
+        .app-sidebar.collapsed .nav-section-label,
+        .app-sidebar.collapsed .nav-text,
+        .app-sidebar.collapsed .nav-module-header .badge {
+            display: none;
+        }
+
+        .app-sidebar.collapsed .nav-module-header,
+        .app-sidebar.collapsed .nav-sublink {
+            justify-content: center;
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+
+        .app-sidebar.collapsed .sidebar-nav {
+            padding-left: 0.35rem;
+            padding-right: 0.35rem;
+        }
+}

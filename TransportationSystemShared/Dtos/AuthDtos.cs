@@ -10,6 +10,12 @@ public class LoginRequestDto
 
     [Required]
     public string Password { get; set; } = string.Empty;
+
+    // Captured by the Web app from the real browser request (the API itself only
+    // sees the Web app's server-to-server call, not the end user's connection).
+    public string? IpAddress { get; set; }
+    public string? DeviceId { get; set; }
+    public string? UserAgent { get; set; }
 }
 
 public class LoginResponseDto
@@ -57,6 +63,22 @@ public class CompanyProfileDto
     public string? Address { get; set; }
     public string? ContactEmail { get; set; }
     public string? ContactPhone { get; set; }
+}
+
+public class LoginHistoryDto
+{
+    public int Id { get; set; }
+    public int? UserId { get; set; }
+    public string AttemptedUsername { get; set; } = string.Empty;
+    public bool IsSuccessful { get; set; }
+    public DateTime LoginAt { get; set; }
+    public string? IpAddress { get; set; }
+    public string? DeviceId { get; set; }
+    public string? Browser { get; set; }
+    public string? OperatingSystem { get; set; }
+    public string? City { get; set; }
+    public string? Region { get; set; }
+    public string? Country { get; set; }
 }
 
 public class CompanyProfileUpsertDto

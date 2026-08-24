@@ -1,0 +1,44 @@
+.driver-card {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    transition: box-shadow 0.15s ease-in-out, transform 0.15s ease-in-out;
+    overflow: hidden;
+}
+
+.driver-card:hover {
+    box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+}
+
+.driver-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1rem 0.5rem;
+    background: linear-gradient(135deg, #eef3fb 0%, #f8fafc 100%);
+}
+
+.driver-card-icon {
+    font-size: 1.75rem;
+    color: #375a8c;
+    opacity: 0.85;
+}
+
+.driver-card-status {
+    font-size: 0.7rem;
+}
+
+.driver-card-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.35rem;
+}
+
+.driver-card-row i {
+    width: 1rem;
+    text-align: center;
+    flex-shrink: 0;
+}

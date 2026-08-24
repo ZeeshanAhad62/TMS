@@ -1,73 +1,90 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @inject FleetApiClient Api
 @inject NavigationManager Nav
 
 <div class="app-shell">
-    <aside class="app-sidebar">
+    <aside class="app-sidebar @(_sidebarOpen ? "open" : "") @(_sidebarCollapsed ? "collapsed" : "")">
         <div class="sidebar-brand">
-            @if (_companyLogoUrl is not null)
-            {
-                <img src="@_companyLogoUrl" alt="@_companyName" class="sidebar-logo" />
-            }
-            else
-            {
-                <i class="bi bi-truck sidebar-logo-icon"></i>
-            }
-            <div class="sidebar-brand-text">
-                <div class="company-name">@(_companyName ?? "My Transport Company")</div>
-                <div class="system-name">Transportation Management System</div>
-            </div>
+            <a href="/" class="sidebar-brand-link" title="Go to dashboard">
+                @if (_companyLogoUrl is not null)
+                {
+                    <img src="@_companyLogoUrl" alt="@_companyName" class="sidebar-logo" />
+                }
+                else
+                {
+                    <i class="bi bi-truck sidebar-logo-icon"></i>
+                }
+                <div class="sidebar-brand-text">
+                    <div class="company-name">@(_companyName ?? "My Transport Company")</div>
+                    <div class="system-name">Transportation Management System</div>
+                </div>
+            </a>
+            <button class="sidebar-close d-lg-none" type="button" @onclick="CloseSidebar" aria-label="Close menu">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
 
         <nav class="sidebar-nav">
+            <div class="nav-module">
+                <a class="nav-module-header @SubLinkClass("/")" href="/" title="Home">
+                    <i class="bi bi-house-door"></i> <span class="nav-text">Home</span>
+                </a>
+            </div>
+
             <div class="nav-section-label">Modules</div>
 
             <div class="nav-module">
-                <div class="nav-module-header active-module">
-                    <i class="bi bi-truck"></i> Fleet Management
+                <div class="nav-module-header active-module" title="Fleet Management">
+                    <i class="bi bi-truck"></i> <span class="nav-text">Fleet Management</span>
                 </div>
-                <a class="nav-sublink @SubLinkClass("/fleet-vehicles")" href="/fleet-vehicles">
-                    <i class="bi bi-list-ul"></i> Fleet Master
+                <a class="nav-sublink @SubLinkClass("/fleet-vehicles")" href="/fleet-vehicles" title="Fleet Master">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Fleet Master</span>
                 </a>
             </div>
 
             <div class="nav-module">
-                <a class="nav-module-header coming-soon" href="/modules/coming-soon/driver-management">
-                    <i class="bi bi-person-badge"></i> Driver Management
+                <div class="nav-module-header @(SubLinkClass("/drivers") == "active" ? "active-module" : "")" title="Driver Management">
+                    <i class="bi bi-person-badge"></i> <span class="nav-text">Driver Management</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/drivers")" href="/drivers" title="Driver Master">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Driver Master</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
+                <a class="nav-module-header coming-soon" href="/modules/coming-soon/trip-booking" title="Trip / Booking">
+                    <i class="bi bi-calendar-check"></i> <span class="nav-text">Trip / Booking</span>
                     <span class="badge bg-secondary ms-auto">Soon</span>
                 </a>
             </div>
 
             <div class="nav-module">
-                <a class="nav-module-header coming-soon" href="/modules/coming-soon/trip-booking">
-                    <i class="bi bi-calendar-check"></i> Trip / Booking
+                <a class="nav-module-header coming-soon" href="/modules/coming-soon/maintenance-workshop" title="Maintenance &amp; Workshop">
+                    <i class="bi bi-tools"></i> <span class="nav-text">Maintenance &amp; Workshop</span>
                     <span class="badge bg-secondary ms-auto">Soon</span>
                 </a>
             </div>
 
             <div class="nav-module">
-                <a class="nav-module-header coming-soon" href="/modules/coming-soon/maintenance-workshop">
-                    <i class="bi bi-tools"></i> Maintenance &amp; Workshop
-                    <span class="badge bg-secondary ms-auto">Soon</span>
-                </a>
-            </div>
-
-            <div class="nav-module">
-                <a class="nav-module-header coming-soon" href="/modules/coming-soon/reports-analytics">
-                    <i class="bi bi-bar-chart"></i> Reports &amp; Analytics
+                <a class="nav-module-header coming-soon" href="/modules/coming-soon/reports-analytics" title="Reports &amp; Analytics">
+                    <i class="bi bi-bar-chart"></i> <span class="nav-text">Reports &amp; Analytics</span>
                     <span class="badge bg-secondary ms-auto">Soon</span>
                 </a>
             </div>
 
             <div class="nav-section-label mt-3">Settings</div>
             <div class="nav-module">
-                <a class="nav-sublink" href="/settings/company">
-                    <i class="bi bi-building"></i> Company Profile
+                <a class="nav-sublink @SubLinkClass("/settings/company")" href="/settings/company" title="Company Profile">
+                    <i class="bi bi-building"></i> <span class="nav-text">Company Profile</span>
                 </a>
                 <AuthorizeView Roles="Admin">
                     <Authorized>
-                        <a class="nav-sublink" href="/settings/users">
-                            <i class="bi bi-people"></i> Users
+                        <a class="nav-sublink @SubLinkClass("/settings/users")" href="/settings/users" title="Users">
+                            <i class="bi bi-people"></i> <span class="nav-text">Users</span>
+                        </a>
+                        <a class="nav-sublink @SubLinkClass("/settings/login-history")" href="/settings/login-history" title="Login History">
+                            <i class="bi bi-clock-history"></i> <span class="nav-text">Login History</span>
                         </a>
                     </Authorized>
                 </AuthorizeView>
@@ -75,15 +92,26 @@
         </nav>
     </aside>
 
+    @if (_sidebarOpen)
+    {
+        <div class="sidebar-backdrop d-lg-none" @onclick="CloseSidebar"></div>
+    }
+
     <div class="app-main">
         <header class="app-topbar">
+            <button class="sidebar-toggle d-lg-none" type="button" @onclick="ToggleSidebar" aria-label="Open menu">
+                <i class="bi bi-list"></i>
+            </button>
+            <button class="sidebar-toggle d-none d-lg-inline-flex" type="button" @onclick="ToggleCollapse" aria-label="Toggle sidebar" title="Toggle sidebar">
+                <i class="bi bi-layout-sidebar"></i>
+            </button>
             <div class="topbar-title">@(_companyName ?? "Transportation Management System")</div>
             <AuthorizeView>
                 <Authorized>
                     <div class="topbar-user dropdown">
                         <button class="btn btn-link text-decoration-none dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown">
                             <i class="bi bi-person-circle me-1"></i>
-                            @context.User.FindFirst("FullName")?.Value
+                            <span class="d-none d-sm-inline">@context.User.FindFirst("FullName")?.Value</span>
                             <span class="badge bg-light text-dark border ms-2">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
@@ -115,9 +143,13 @@
 @code {
     private string? _companyName;
     private string? _companyLogoUrl;
+    private bool _sidebarOpen;
+    private bool _sidebarCollapsed;
 
     protected override async Task OnInitializedAsync()
     {
+        Nav.LocationChanged += OnLocationChanged;
+
         try
         {
             var profile = await Api.GetCompanyProfileAsync();
@@ -133,6 +165,28 @@
         }
     }
 
-    private string SubLinkClass(string href) =>
-        Nav.ToBaseRelativePath(Nav.Uri).StartsWith(href.TrimStart('/'), StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    private void ToggleSidebar() => _sidebarOpen = !_sidebarOpen;
+
+    private void ToggleCollapse() => _sidebarCollapsed = !_sidebarCollapsed;
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => CloseSidebar();
+
+    private void CloseSidebar()
+    {
+        if (!_sidebarOpen) return;
+        _sidebarOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private string SubLinkClass(string href)
+    {
+        var relativePath = Nav.ToBaseRelativePath(Nav.Uri);
+        if (href == "/") return relativePath.Length == 0 ? "active" : "";
+        return relativePath.StartsWith(href.TrimStart('/'), StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+    }
 }

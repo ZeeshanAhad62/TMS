@@ -59,7 +59,23 @@ app.MapPost("/auth/login", async (HttpContext http, AuthApiClient api) =>
     var password = form["password"].ToString();
     var returnUrl = form["returnUrl"].ToString();
 
-    var result = await api.LoginAsync(username, password);
+    const string deviceCookieName = "tms_device_id";
+    if (!http.Request.Cookies.TryGetValue(deviceCookieName, out var deviceId) || string.IsNullOrEmpty(deviceId))
+    {
+        deviceId = Guid.NewGuid().ToString("N");
+        http.Response.Cookies.Append(deviceCookieName, deviceId, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = http.Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTimeOffset.UtcNow.AddYears(2)
+        });
+    }
+
+    var ipAddress = http.Connection.RemoteIpAddress?.ToString();
+    var userAgent = http.Request.Headers.UserAgent.ToString();
+
+    var result = await api.LoginAsync(username, password, ipAddress, deviceId, userAgent);
     if (result is null)
     {
         var errorRedirect = "/login?error=1";

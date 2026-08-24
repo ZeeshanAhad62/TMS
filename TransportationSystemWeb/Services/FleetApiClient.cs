@@ -105,6 +105,15 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Login History -----
+
+    public async Task<List<LoginHistoryDto>> GetLoginHistoryAsync(int? userId = null, int limit = 100)
+    {
+        await AuthorizeAsync();
+        var qs = userId.HasValue ? $"?userId={userId}&limit={limit}" : $"?limit={limit}";
+        return await _http.GetFromJsonAsync<List<LoginHistoryDto>>($"api/login-history{qs}", JsonOptions) ?? new();
+    }
+
     // ----- Vehicles -----
 
     public async Task<List<VehicleListItemDto>> GetVehiclesAsync(string? search = null, VehicleType? type = null, OperationalStatus? status = null)
@@ -256,6 +265,96 @@ public class FleetApiClient
     {
         await AuthorizeAsync();
         var response = await _http.DeleteAsync($"api/vehicles/{vehicleId}/bookings/{bookingId}");
+        await EnsureSuccess(response);
+    }
+
+    // ----- Drivers -----
+
+    public async Task<List<DriverListItemDto>> GetDriversAsync(string? search = null, DriverStatus? status = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        if (status.HasValue) query.Add($"status={status}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+
+        return await _http.GetFromJsonAsync<List<DriverListItemDto>>($"api/drivers{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<DriverDetailDto?> GetDriverAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/drivers/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<DriverDetailDto>(JsonOptions);
+    }
+
+    public async Task<DriverDetailDto> CreateDriverAsync(DriverUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/drivers", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<DriverDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateDriverAsync(int id, DriverUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/drivers/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteDriverAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/drivers/{id}");
+        await EnsureSuccess(response);
+    }
+
+    // ----- Driver Documents -----
+
+    public async Task<DriverDocumentDto> UploadDriverDocumentAsync(int driverId, DriverDocumentCategory category, string fileName, string contentType, Stream content)
+    {
+        await AuthorizeAsync();
+        using var form = new MultipartFormDataContent();
+        using var streamContent = new StreamContent(content);
+        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        form.Add(new StringContent(category.ToString()), "category");
+        form.Add(streamContent, "file", fileName);
+
+        var response = await _http.PostAsync($"api/drivers/{driverId}/documents", form);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<DriverDocumentDto>(JsonOptions))!;
+    }
+
+    public async Task DeleteDriverDocumentAsync(int driverId, int documentId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/drivers/{driverId}/documents/{documentId}");
+        await EnsureSuccess(response);
+    }
+
+    // ----- Driver Assignments -----
+
+    public async Task<DriverVehicleAssignmentDto> CreateAssignmentAsync(int driverId, DriverVehicleAssignmentUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/drivers/{driverId}/assignments", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<DriverVehicleAssignmentDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateAssignmentAsync(int driverId, int assignmentId, DriverVehicleAssignmentUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/drivers/{driverId}/assignments/{assignmentId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteAssignmentAsync(int driverId, int assignmentId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/drivers/{driverId}/assignments/{assignmentId}");
         await EnsureSuccess(response);
     }
 

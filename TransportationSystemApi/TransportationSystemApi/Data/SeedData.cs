@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using TransportationSystemApi.Models;
 
@@ -16,16 +15,15 @@ public static class SeedData
 
         if (!await db.Users.AnyAsync())
         {
-            var hasher = new PasswordHasher<User>();
             var admin = new User
             {
                 Username = DefaultAdminUsername,
                 Email = config["Seed:AdminEmail"] ?? "admin@example.com",
+                Password = DefaultAdminPassword,
                 FullName = "System Administrator",
                 Role = UserRole.Admin,
                 IsActive = true
             };
-            admin.PasswordHash = hasher.HashPassword(admin, DefaultAdminPassword);
             db.Users.Add(admin);
 
             logger.LogWarning(

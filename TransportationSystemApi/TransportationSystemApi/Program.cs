@@ -29,6 +29,7 @@ builder.Services.AddDbContext<FleetDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("FleetDb")));
 
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddHttpClient<GeoLocationService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key is not configured.");
@@ -71,7 +72,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles();
-app.UseHttpsRedirection();
+
+// No UseHttpsRedirection(): this API is only ever called server-to-server by the
+// Web app (never a browser directly), and redirecting http->https here causes
+// HttpClient to silently drop the Authorization header on the cross-scheme hop.
+// If this API is ever exposed over https in production, point ApiBaseUrl at the
+// https URL directly instead of relying on a redirect.
 
 app.UseCors("AllowBlazorClient");
 

@@ -65,54 +65,53 @@ else if (_vehicles.Count == 0)
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-hover align-middle bg-white">
-            <thead class="table-light">
-                <tr>
-                    <th>Vehicle Code</th>
-                    <th>Registration No.</th>
-                    <th>Type</th>
-                    <th>Make / Model</th>
-                    <th>Status</th>
-                    <th>Location</th>
-                    <th>Nearest Doc. Expiry</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var v in _vehicles)
-                {
-                    <tr>
-                        <td><span class="font-monospace">@v.VehicleCode</span></td>
-                        <td>@v.RegistrationNumber</td>
-                        <td>@v.VehicleType.ToDisplayName()</td>
-                        <td>@($"{v.Make} {v.Model}".Trim())</td>
-                        <td><span class="badge @StatusBadgeClass(v.CurrentStatus)">@v.CurrentStatus.ToDisplayName()</span></td>
-                        <td>@v.CurrentLocation</td>
-                        <td>
+    <div class="row g-3">
+        @foreach (var v in _vehicles)
+        {
+            <div class="col-sm-6 col-lg-4 col-xl-3">
+                <div class="card vehicle-card h-100">
+                    <div class="vehicle-card-header">
+                        <i class="bi @VehicleIcon(v.VehicleType) vehicle-card-icon"></i>
+                        <span class="badge @StatusBadgeClass(v.CurrentStatus) vehicle-card-status">@v.CurrentStatus.ToDisplayName()</span>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title mb-0 font-monospace">@v.VehicleCode</h5>
+                        <div class="text-muted small mb-2">@v.RegistrationNumber</div>
+
+                        <div class="vehicle-card-row">
+                            <i class="bi bi-truck-front text-muted"></i>
+                            <span>@v.VehicleType.ToDisplayName() &middot; @($"{v.Make} {v.Model}".Trim())</span>
+                        </div>
+                        <div class="vehicle-card-row">
+                            <i class="bi bi-geo-alt text-muted"></i>
+                            <span>@(string.IsNullOrWhiteSpace(v.CurrentLocation) ? "—" : v.CurrentLocation)</span>
+                        </div>
+                        <div class="vehicle-card-row mb-3">
+                            <i class="bi bi-file-earmark-text text-muted"></i>
                             @if (v.NearestDocumentExpiry is not null)
                             {
                                 <span class="badge @(v.HasExpiringDocument ? "bg-danger" : "bg-secondary")">
-                                    @v.NearestDocumentExpiry.Value.ToString("dd-MMM-yyyy")
+                                    Expires @v.NearestDocumentExpiry.Value.ToString("dd-MMM-yyyy")
                                 </span>
                             }
                             else
                             {
-                                <span class="text-muted">&mdash;</span>
+                                <span class="text-muted">No document on file</span>
                             }
-                        </td>
-                        <td class="text-end">
-                            <a class="btn btn-sm btn-outline-primary" href="/fleet-vehicles/@v.Id/edit">
+                        </div>
+
+                        <div class="mt-auto d-flex gap-2">
+                            <a class="btn btn-sm btn-outline-primary flex-fill" href="/fleet-vehicles/@v.Id/edit">
                                 <i class="bi bi-pencil-square"></i> Open
                             </a>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(v.Id)">
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(v.Id)" title="Delete vehicle">
                                 <i class="bi bi-trash"></i>
                             </button>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 }
 
@@ -169,5 +168,15 @@ else
         OperationalStatus.UnderMaintenance => "bg-warning text-dark",
         OperationalStatus.OutOfService => "bg-danger",
         _ => "bg-secondary"
+    };
+
+    private static string VehicleIcon(VehicleType type) => type switch
+    {
+        VehicleType.Truck => "bi-truck",
+        VehicleType.Trailer => "bi-truck-flatbed",
+        VehicleType.ContainerCarrier => "bi-box-seam",
+        VehicleType.Van => "bi-truck-front",
+        VehicleType.Bus => "bi-bus-front",
+        _ => "bi-truck-front"
     };
 }
