@@ -71,9 +71,11 @@
             </div>
 
             <div class="nav-module">
-                <a class="nav-module-header coming-soon" href="/modules/coming-soon/reports-analytics" title="Reports &amp; Analytics">
+                <div class="nav-module-header @(SubLinkClass("/reports") == "active" ? "active-module" : "")" title="Reports &amp; Analytics">
                     <i class="bi bi-bar-chart"></i> <span class="nav-text">Reports &amp; Analytics</span>
-                    <span class="badge bg-secondary ms-auto">Soon</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/reports")" href="/reports" title="Reports Overview">
+                    <i class="bi bi-graph-up"></i> <span class="nav-text">Reports Overview</span>
                 </a>
             </div>
 

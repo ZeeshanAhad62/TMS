@@ -1,0 +1,290 @@
+@page "/reports"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Reports &amp; Analytics</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Reports &amp; Analytics</h2>
+        <div class="text-muted small">
+            Reports &amp; Analytics &rsaquo; Overview
+            @if (_data is not null)
+            {
+                <span> &mdash; generated @_data.GeneratedAt.ToLocalTime().ToString("dd-MMM-yyyy HH:mm")</span>
+            }
+        </div>
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="Reload" disabled="@_loading">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+    </button>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_data is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <!-- ===================== FLEET ===================== -->
+    <h5 class="mb-2"><i class="bi bi-truck me-2"></i>Fleet Analytics</h5>
+    <div class="row g-3">
+        <div class="col-md-3">
+            @StatCard("Total Vehicles", _data.Fleet.TotalVehicles.ToString(), "bi-truck", "primary")
+        </div>
+        <div class="col-md-3">
+            @StatCard("Docs Expiring Soon", _data.Fleet.VehiclesWithExpiringDocs.ToString(), "bi-file-earmark-exclamation", "warning")
+        </div>
+        <div class="col-md-3">
+            @StatCard("Vehicle Types", _data.Fleet.ByType.Count.ToString(), "bi-diagram-3", "secondary")
+        </div>
+        <div class="col-md-3">
+            @StatCard("Fuel Types", _data.Fleet.ByFuelType.Count.ToString(), "bi-fuel-pump", "secondary")
+        </div>
+    </div>
+    <div class="row g-3 mt-1">
+        <div class="col-md-5">
+            <div class="card chart-card h-100"><div class="card-body">
+                <h6 class="mb-2">Fleet by Status</h6>
+                <div class="chart-wrap"><canvas id="fleetStatusChart"></canvas></div>
+            </div></div>
+        </div>
+        <div class="col-md-7">
+            <div class="card chart-card h-100"><div class="card-body">
+                <h6 class="mb-2">Fleet by Type</h6>
+                <div class="chart-wrap"><canvas id="fleetTypeChart"></canvas></div>
+            </div></div>
+        </div>
+    </div>
+    <div class="row g-3 mt-1">
+        <div class="col-md-6">@BreakdownTable("Fleet by Fuel Type", _data.Fleet.ByFuelType, false)</div>
+        <div class="col-md-6">@BreakdownTable("Fleet by Ownership", _data.Fleet.ByOwnership, false)</div>
+    </div>
+
+    <hr class="my-4" />
+
+    <!-- ===================== DRIVERS ===================== -->
+    <h5 class="mb-2"><i class="bi bi-person-badge me-2"></i>Driver Analytics</h5>
+    <div class="row g-3">
+        <div class="col-md-3">@StatCard("Total Drivers", _data.Drivers.TotalDrivers.ToString(), "bi-person-badge", "primary")</div>
+        <div class="col-md-3">@StatCard("Licenses Expiring Soon", _data.Drivers.LicensesExpiringSoon.ToString(), "bi-file-earmark-exclamation", "warning")</div>
+    </div>
+    <div class="row g-3 mt-1">
+        <div class="col-md-5">
+            <div class="card chart-card h-100"><div class="card-body">
+                <h6 class="mb-2">Drivers by Status</h6>
+                <div class="chart-wrap"><canvas id="driverStatusChart"></canvas></div>
+            </div></div>
+        </div>
+        <div class="col-md-7">@BreakdownTable("Drivers by Status", _data.Drivers.ByStatus, false)</div>
+    </div>
+
+    <hr class="my-4" />
+
+    <!-- ===================== TRIPS ===================== -->
+    <h5 class="mb-2"><i class="bi bi-calendar-check me-2"></i>Trip Analytics</h5>
+    <div class="row g-3">
+        <div class="col-md-3">@StatCard("Total Trips", _data.Trips.TotalTrips.ToString(), "bi-calendar-check", "primary")</div>
+        <div class="col-md-3">@StatCard("Completed", _data.Trips.CompletedTrips.ToString(), "bi-check2-circle", "success")</div>
+        <div class="col-md-3">@StatCard("Total Revenue", _data.Trips.TotalRevenue.ToString("N0"), "bi-cash-stack", "success")</div>
+        <div class="col-md-3">@StatCard("Completed Revenue", _data.Trips.CompletedRevenue.ToString("N0"), "bi-cash", "secondary")</div>
+    </div>
+    <div class="row g-3 mt-1">
+        <div class="col-md-7">
+            <div class="card chart-card h-100"><div class="card-body">
+                <h6 class="mb-2">Trips per Month (last 6)</h6>
+                <div class="chart-wrap"><canvas id="tripMonthChart"></canvas></div>
+            </div></div>
+        </div>
+        <div class="col-md-5">
+            <div class="card chart-card h-100"><div class="card-body">
+                <h6 class="mb-2">Trips by Status</h6>
+                <div class="chart-wrap"><canvas id="tripStatusChart"></canvas></div>
+            </div></div>
+        </div>
+    </div>
+    <div class="row g-3 mt-1">
+        <div class="col-md-6">@NamedTable("Top Vehicles by Trips", _data.Trips.TopVehicles, "Trips", false)</div>
+        <div class="col-md-6">@NamedTable("Top Drivers by Trips", _data.Trips.TopDrivers, "Trips", false)</div>
+    </div>
+
+    <hr class="my-4" />
+
+    <!-- ===================== MAINTENANCE ===================== -->
+    <h5 class="mb-2"><i class="bi bi-tools me-2"></i>Maintenance Analytics</h5>
+    <div class="row g-3">
+        <div class="col-md-3">@StatCard("Total Work Orders", _data.Maintenance.TotalWorkOrders.ToString(), "bi-tools", "primary")</div>
+        <div class="col-md-3">@StatCard("Open", _data.Maintenance.OpenWorkOrders.ToString(), "bi-hourglass-split", "warning")</div>
+        <div class="col-md-3">@StatCard("In Progress", _data.Maintenance.InProgressWorkOrders.ToString(), "bi-wrench-adjustable", "primary")</div>
+        <div class="col-md-3">@StatCard("Completed Cost", _data.Maintenance.TotalCost.ToString("N0"), "bi-cash-coin", "success")</div>
+    </div>
+    <div class="row g-3 mt-1">
+        <div class="col-md-5">
+            <div class="card chart-card h-100"><div class="card-body">
+                <h6 class="mb-2">Work Orders by Status</h6>
+                <div class="chart-wrap"><canvas id="maintStatusChart"></canvas></div>
+            </div></div>
+        </div>
+        <div class="col-md-7">
+            <div class="card chart-card h-100"><div class="card-body">
+                <h6 class="mb-2">Maintenance Cost per Month (last 6)</h6>
+                <div class="chart-wrap"><canvas id="maintCostMonthChart"></canvas></div>
+            </div></div>
+        </div>
+    </div>
+    <div class="row g-3 mt-1">
+        <div class="col-md-6">@BreakdownTable("Work Orders by Type", _data.Maintenance.ByType, true)</div>
+        <div class="col-md-6">@NamedTable("Top Vehicles by Maintenance Cost", _data.Maintenance.CostByVehicle, "Orders", true)</div>
+    </div>
+}
+
+@code {
+    private ReportsSummaryDto? _data;
+    private bool _loading = true;
+    private string? _error;
+    private bool _chartsDirty;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Reload() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _data = await Api.GetReportsSummaryAsync();
+            if (_data is null) _error = "Failed to load report data.";
+            else _chartsDirty = true;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load reports: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_data is null || !_chartsDirty) return;
+        _chartsDirty = false;
+        await RenderChartsAsync();
+    }
+
+    private async Task RenderChartsAsync()
+    {
+        var d = _data!;
+
+        await Doughnut("fleetStatusChart", d.Fleet.ByStatus);
+        await Bar("fleetTypeChart", d.Fleet.ByType, "#3a6df0");
+        await Doughnut("driverStatusChart", d.Drivers.ByStatus);
+
+        await JS.InvokeVoidAsync("renderBarChart", "tripMonthChart",
+            d.Trips.ByMonth.Select(p => MonthLabel(p.Month)).ToArray(),
+            d.Trips.ByMonth.Select(p => p.Count).ToArray(), "#22c3a6");
+        await Doughnut("tripStatusChart", d.Trips.ByStatus);
+
+        await Doughnut("maintStatusChart", d.Maintenance.ByStatus);
+        await JS.InvokeVoidAsync("renderBarChart", "maintCostMonthChart",
+            d.Maintenance.CostByMonth.Select(p => MonthLabel(p.Month)).ToArray(),
+            d.Maintenance.CostByMonth.Select(p => (double)p.Amount).ToArray(), "#f0a13a");
+    }
+
+    private async Task Doughnut(string canvasId, List<ReportBucketDto> buckets) =>
+        await JS.InvokeVoidAsync("renderDoughnutChart", canvasId,
+            buckets.Select(b => Prettify(b.Label)).ToArray(),
+            buckets.Select(b => b.Count).ToArray());
+
+    private async Task Bar(string canvasId, List<ReportBucketDto> buckets, string color) =>
+        await JS.InvokeVoidAsync("renderBarChart", canvasId,
+            buckets.Select(b => Prettify(b.Label)).ToArray(),
+            buckets.Select(b => b.Count).ToArray(), color);
+
+    private RenderFragment StatCard(string label, string value, string icon, string color) => @<div class="card stat-card h-100">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">@label</div>
+                <div class="stat-icon bg-@color bg-opacity-10 text-@color"><i class="bi @icon"></i></div>
+            </div>
+            <div class="stat-value">@value</div>
+        </div>
+    </div>;
+
+    private RenderFragment BreakdownTable(string title, List<ReportBucketDto> buckets, bool showAmount) => @<div class="card h-100"><div class="card-body">
+        <h6 class="mb-3">@title</h6>
+        @if (buckets.Count == 0)
+        {
+            <div class="text-muted small">No data.</div>
+        }
+        else
+        {
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light"><tr><th>@title.Split(" by ").Last()</th><th class="text-end">Count</th>@if (showAmount) {<th class="text-end">Cost</th>}</tr></thead>
+                <tbody>
+                @foreach (var b in buckets)
+                {
+                    <tr><td>@Prettify(b.Label)</td><td class="text-end">@b.Count</td>@if (showAmount) {<td class="text-end">@b.Amount.ToString("N2")</td>}</tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div></div>;
+
+    private RenderFragment NamedTable(string title, List<NamedCountDto> rows, string countHeader, bool showAmount) => @<div class="card h-100"><div class="card-body">
+        <h6 class="mb-3">@title</h6>
+        @if (rows.Count == 0)
+        {
+            <div class="text-muted small">No data.</div>
+        }
+        else
+        {
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light"><tr><th>Name</th><th class="text-end">@countHeader</th>@if (showAmount) {<th class="text-end">Cost</th>} else {<th class="text-end">Revenue</th>}</tr></thead>
+                <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr>
+                        <td><div class="font-monospace small">@r.Name</div><div class="text-muted" style="font-size:0.75rem;">@r.SubLabel</div></td>
+                        <td class="text-end">@r.Count</td>
+                        <td class="text-end">@r.Amount.ToString("N2")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div></div>;
+
+    // "InProgress" -> "In Progress", "ContainerCarrier" -> "Container Carrier"
+    private static string Prettify(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < name.Length; i++)
+        {
+            if (i > 0 && char.IsUpper(name[i]) && !char.IsUpper(name[i - 1]))
+                sb.Append(' ');
+            sb.Append(name[i]);
+        }
+        return sb.ToString();
+    }
+
+    private static string MonthLabel(string yyyyMM)
+    {
+        return DateTime.TryParse($"{yyyyMM}-01", out var dt)
+            ? dt.ToString("MMM yyyy")
+            : yyyyMM;
+    }
+
+    public void Dispose() { }
+}

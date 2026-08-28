@@ -297,6 +297,16 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Reports & Analytics -----
+
+    public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync("api/reports/summary");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<ReportsSummaryDto>(JsonOptions);
+    }
+
     // ----- Work Orders (Maintenance & Workshop) -----
 
     public async Task<List<WorkOrderListItemDto>> GetWorkOrdersAsync(int? vehicleId = null, WorkOrderStatus? status = null, MaintenanceType? type = null, string? search = null)
