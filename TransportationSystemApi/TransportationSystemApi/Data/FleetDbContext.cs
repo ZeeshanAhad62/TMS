@@ -22,6 +22,8 @@ public class FleetDbContext : DbContext
     public DbSet<DriverDocument> DriverDocuments => Set<DriverDocument>();
     public DbSet<DriverVehicleAssignment> DriverVehicleAssignments => Set<DriverVehicleAssignment>();
     public DbSet<Trip> Trips => Set<Trip>();
+    public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
+    public DbSet<WorkOrderItem> WorkOrderItems => Set<WorkOrderItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -137,6 +139,29 @@ public class FleetDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(t => t.DriverId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkOrder>(entity =>
+        {
+            entity.HasIndex(w => w.WorkOrderCode).IsUnique();
+            entity.Property(w => w.Odometer).HasPrecision(18, 2);
+            entity.Property(w => w.LabourCost).HasPrecision(18, 2);
+
+            entity.HasOne(w => w.Vehicle)
+                .WithMany(v => v.WorkOrders)
+                .HasForeignKey(w => w.VehicleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(w => w.Items)
+                .WithOne(i => i.WorkOrder)
+                .HasForeignKey(i => i.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkOrderItem>(entity =>
+        {
+            entity.Property(i => i.Quantity).HasPrecision(18, 2);
+            entity.Property(i => i.UnitCost).HasPrecision(18, 2);
         });
     }
 }

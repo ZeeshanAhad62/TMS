@@ -297,6 +297,73 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Work Orders (Maintenance & Workshop) -----
+
+    public async Task<List<WorkOrderListItemDto>> GetWorkOrdersAsync(int? vehicleId = null, WorkOrderStatus? status = null, MaintenanceType? type = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (vehicleId.HasValue) query.Add($"vehicleId={vehicleId}");
+        if (status.HasValue) query.Add($"status={status}");
+        if (type.HasValue) query.Add($"type={type}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+
+        return await _http.GetFromJsonAsync<List<WorkOrderListItemDto>>($"api/workorders{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<WorkOrderDetailDto?> GetWorkOrderAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/workorders/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<WorkOrderDetailDto>(JsonOptions);
+    }
+
+    public async Task<WorkOrderDetailDto> CreateWorkOrderAsync(WorkOrderUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/workorders", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<WorkOrderDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateWorkOrderAsync(int id, WorkOrderUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/workorders/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteWorkOrderAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/workorders/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<WorkOrderItemDto> CreateWorkOrderItemAsync(int workOrderId, WorkOrderItemUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/workorders/{workOrderId}/items", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<WorkOrderItemDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateWorkOrderItemAsync(int workOrderId, int itemId, WorkOrderItemUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/workorders/{workOrderId}/items/{itemId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteWorkOrderItemAsync(int workOrderId, int itemId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/workorders/{workOrderId}/items/{itemId}");
+        await EnsureSuccess(response);
+    }
+
     // ----- Drivers -----
 
     public async Task<List<DriverListItemDto>> GetDriversAsync(string? search = null, DriverStatus? status = null)

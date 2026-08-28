@@ -62,9 +62,11 @@
             </div>
 
             <div class="nav-module">
-                <a class="nav-module-header coming-soon" href="/modules/coming-soon/maintenance-workshop" title="Maintenance &amp; Workshop">
+                <div class="nav-module-header @(SubLinkClass("/workorders") == "active" ? "active-module" : "")" title="Maintenance &amp; Workshop">
                     <i class="bi bi-tools"></i> <span class="nav-text">Maintenance &amp; Workshop</span>
-                    <span class="badge bg-secondary ms-auto">Soon</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/workorders")" href="/workorders" title="Work Orders">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Work Orders</span>
                 </a>
             </div>
 

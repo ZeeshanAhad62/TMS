@@ -1,0 +1,182 @@
+@page "/workorders"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Maintenance &amp; Workshop</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Maintenance &amp; Workshop</h2>
+        <div class="text-muted small">Maintenance &amp; Workshop &rsaquo; Work Orders</div>
+    </div>
+    <a class="btn btn-primary" href="/workorders/new">
+        <i class="bi bi-plus-lg me-1"></i>Add Work Order
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <input class="form-control" placeholder="Search code, workshop, description..."
+                       @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_vehicleFilter">
+                    <option value="">All vehicles</option>
+                    @foreach (var v in _vehicles)
+                    {
+                        <option value="@v.Id">@v.VehicleCode &mdash; @v.RegistrationNumber</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" @bind="_statusFilter">
+                    <option value="">All statuses</option>
+                    @foreach (var s in Enum.GetValues<WorkOrderStatus>())
+                    {
+                        <option value="@s">@s.ToDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" @bind="_typeFilter">
+                    <option value="">All types</option>
+                    @foreach (var t in Enum.GetValues<MaintenanceType>())
+                    {
+                        <option value="@t">@t.ToDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-outline-secondary" @onclick="Load">
+                    <i class="bi bi-funnel me-1"></i>Apply
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_workOrders is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_workOrders.Count == 0)
+{
+    <div class="alert alert-info">No work orders found. Click "Add Work Order" to create the first one.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Code</th><th>Vehicle</th><th>Type</th><th>Priority</th><th>Reported</th><th>Scheduled</th><th>Status</th><th class="text-end">Total Cost</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var w in _workOrders)
+                {
+                    <tr>
+                        <td class="font-monospace">@w.WorkOrderCode</td>
+                        <td>@w.VehicleCode &mdash; @w.VehicleRegistrationNumber</td>
+                        <td>@w.Type.ToDisplayName()</td>
+                        <td><span class="badge @PriorityBadgeClass(w.Priority)">@w.Priority.ToDisplayName()</span></td>
+                        <td>@w.ReportedDate.ToString("dd-MMM-yyyy")</td>
+                        <td>@(w.ScheduledDate?.ToString("dd-MMM-yyyy") ?? "—")</td>
+                        <td><span class="badge @StatusBadgeClass(w.Status)">@w.Status.ToDisplayName()</span></td>
+                        <td class="text-end">@w.TotalCost.ToString("N2")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/workorders/@w.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(w.Id)" title="Delete work order">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public int? VehicleId { get; set; }
+
+    private List<WorkOrderListItemDto>? _workOrders;
+    private List<VehicleListItemDto> _vehicles = new();
+    private string _search = "";
+    private string _vehicleFilter = "";
+    private string _statusFilter = "";
+    private string _typeFilter = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (VehicleId.HasValue) _vehicleFilter = VehicleId.Value.ToString();
+        _vehicles = await Api.GetVehiclesAsync();
+        await Load();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            int? vehicleId = string.IsNullOrEmpty(_vehicleFilter) ? null : int.Parse(_vehicleFilter);
+            WorkOrderStatus? status = string.IsNullOrEmpty(_statusFilter) ? null : Enum.Parse<WorkOrderStatus>(_statusFilter);
+            MaintenanceType? type = string.IsNullOrEmpty(_typeFilter) ? null : Enum.Parse<MaintenanceType>(_typeFilter);
+            _workOrders = await Api.GetWorkOrdersAsync(vehicleId, status, type, _search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load work orders: {ex.Message}";
+            _workOrders = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Delete this work order?");
+        if (!confirmed) return;
+
+        try
+        {
+            await Api.DeleteWorkOrderAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete work order: {ex.Message}";
+        }
+    }
+
+    private static string StatusBadgeClass(WorkOrderStatus status) => status switch
+    {
+        WorkOrderStatus.Open => "bg-secondary",
+        WorkOrderStatus.InProgress => "bg-primary",
+        WorkOrderStatus.Completed => "bg-success",
+        WorkOrderStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static string PriorityBadgeClass(WorkOrderPriority priority) => priority switch
+    {
+        WorkOrderPriority.Low => "bg-light text-dark border",
+        WorkOrderPriority.Medium => "bg-info text-dark",
+        WorkOrderPriority.High => "bg-warning text-dark",
+        _ => "bg-light text-dark border"
+    };
+}

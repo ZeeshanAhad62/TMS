@@ -14,6 +14,7 @@
         <a class="btn btn-outline-primary btn-sm" href="/fleet-vehicles"><i class="bi bi-truck me-1"></i>Fleet Master</a>
         <a class="btn btn-outline-primary btn-sm" href="/drivers"><i class="bi bi-person-badge me-1"></i>Driver Master</a>
         <a class="btn btn-outline-primary btn-sm" href="/trips"><i class="bi bi-calendar-check me-1"></i>Trip List</a>
+        <a class="btn btn-outline-primary btn-sm" href="/workorders"><i class="bi bi-tools me-1"></i>Work Orders</a>
     </div>
 </div>
 
@@ -22,7 +23,7 @@
     <div class="alert alert-danger">@_error</div>
 }
 
-@if (_vehicles is null || _drivers is null || _trips is null)
+@if (_vehicles is null || _drivers is null || _trips is null || _workOrders is null)
 {
     <p><em>Loading...</em></p>
 }
@@ -329,12 +330,82 @@ else
             </div>
         </div>
     </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-lg-8">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Open Work Orders</div>
+                                <div class="stat-icon bg-warning bg-opacity-25 text-warning-emphasis"><i class="bi bi-tools"></i></div>
+                            </div>
+                            <div class="stat-value">@OpenWorkOrderCount</div>
+                            <div class="stat-sub text-muted">Awaiting workshop</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">In Progress</div>
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-wrench-adjustable"></i></div>
+                            </div>
+                            <div class="stat-value">@InProgressWorkOrderCount</div>
+                            <div class="stat-sub text-muted">Currently in the workshop</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Completed This Month</div>
+                                <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-check2-circle"></i></div>
+                            </div>
+                            <div class="stat-value">@CompletedThisMonthCount</div>
+                            <div class="stat-sub text-muted">@MonthMaintenanceCost.ToString("N0") spent this month</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="mb-3">Upcoming Scheduled Work</h6>
+                    @if (!UpcomingWorkOrders.Any())
+                    {
+                        <div class="text-muted small">Nothing scheduled.</div>
+                    }
+                    else
+                    {
+                        @foreach (var w in UpcomingWorkOrders)
+                        {
+                            <div class="side-list-row">
+                                <div class="side-list-icon bg-warning bg-opacity-25 text-warning-emphasis"><i class="bi bi-tools"></i></div>
+                                <div class="flex-grow-1 text-truncate">
+                                    <div class="font-monospace small">@w.WorkOrderCode</div>
+                                    <div class="text-muted" style="font-size:0.75rem;">@w.VehicleCode &mdash; @w.Type.ToDisplayName()</div>
+                                </div>
+                                <span class="badge bg-secondary">@w.ScheduledDate!.Value.ToString("dd-MMM-yyyy")</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
 }
 
 @code {
     private List<VehicleListItemDto>? _vehicles;
     private List<DriverListItemDto>? _drivers;
     private List<TripListItemDto>? _trips;
+    private List<WorkOrderListItemDto>? _workOrders;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -346,6 +417,7 @@ else
             _vehicles = await Api.GetVehiclesAsync();
             _drivers = await Api.GetDriversAsync();
             _trips = await Api.GetTripsAsync();
+            _workOrders = await Api.GetWorkOrdersAsync();
         }
         catch (Exception ex)
         {
@@ -353,6 +425,7 @@ else
             _vehicles ??= new();
             _drivers ??= new();
             _trips ??= new();
+            _workOrders ??= new();
         }
     }
 
@@ -408,6 +481,31 @@ else
             .OrderBy(t => t.StartDate)
             .Take(5)
             .ToList();
+
+    private int OpenWorkOrderCount => _workOrders?.Count(w => w.Status == WorkOrderStatus.Open) ?? 0;
+    private int InProgressWorkOrderCount => _workOrders?.Count(w => w.Status == WorkOrderStatus.InProgress) ?? 0;
+
+    private int CompletedThisMonthCount =>
+        (_workOrders ?? new()).Count(w => w.Status == WorkOrderStatus.Completed && IsThisMonth(w.CompletedDate));
+
+    private decimal MonthMaintenanceCost =>
+        (_workOrders ?? new())
+            .Where(w => w.Status == WorkOrderStatus.Completed && IsThisMonth(w.CompletedDate))
+            .Sum(w => w.TotalCost);
+
+    private List<WorkOrderListItemDto> UpcomingWorkOrders =>
+        (_workOrders ?? new())
+            .Where(w => w.ScheduledDate.HasValue && w.Status is WorkOrderStatus.Open or WorkOrderStatus.InProgress)
+            .OrderBy(w => w.ScheduledDate)
+            .Take(5)
+            .ToList();
+
+    private static bool IsThisMonth(DateOnly? date)
+    {
+        if (!date.HasValue) return false;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return date.Value.Year == today.Year && date.Value.Month == today.Month;
+    }
 
     private List<(OperationalStatus Status, int Count)> StatusCounts =>
         (_vehicles ?? new())

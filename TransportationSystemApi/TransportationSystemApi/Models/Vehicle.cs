@@ -78,4 +78,5 @@ public class Vehicle
     public List<Tyre> Tyres { get; set; } = new();
     public List<MaintenanceRecord> MaintenanceRecords { get; set; } = new();
     public List<Trip> Trips { get; set; } = new();
+    public List<WorkOrder> WorkOrders { get; set; } = new();
 }
