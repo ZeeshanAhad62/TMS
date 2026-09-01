@@ -26,4 +26,6 @@ public class Trip
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
+
+    public List<TripExpense> Expenses { get; set; } = new();
 }

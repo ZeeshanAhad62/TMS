@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @inject FleetApiClient Api
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>@(IsNew ? "Add Trip" : "Edit Trip") - Trip / Booking</PageTitle>
 
@@ -41,84 +42,190 @@ else
     <EditForm Model="_model" OnValidSubmit="Save">
         <DataAnnotationsValidator />
 
-        <div class="card"><div class="card-body">
-            <h5 class="card-title">Trip Details</h5>
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">Trip Code</label>
-                    <input class="form-control" value="@(IsNew ? "(auto-generated on save)" : _detail?.TripCode)" disabled />
+        <ul class="nav nav-tabs mb-3">
+            @foreach (var tab in Tabs)
+            {
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(_activeTab == tab ? "active" : "")" @onclick="() => _activeTab = tab" disabled="@(IsNew && tab != "Trip Details")">
+                        @tab
+                    </button>
+                </li>
+            }
+        </ul>
+
+        @if (_activeTab == "Trip Details")
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Trip Details</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Trip Code</label>
+                        <input class="form-control" value="@(IsNew ? "(auto-generated on save)" : _detail?.TripCode)" disabled />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Vehicle *</label>
+                        <InputSelect class="form-select" @bind-Value="_model.VehicleId">
+                            <option value="0">Select a vehicle...</option>
+                            @foreach (var v in _vehicles)
+                            {
+                                <option value="@v.Id">@v.VehicleCode &mdash; @v.RegistrationNumber</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Driver *</label>
+                        <InputSelect class="form-select" @bind-Value="_model.DriverId">
+                            <option value="0">Select a driver...</option>
+                            @foreach (var d in _drivers)
+                            {
+                                <option value="@d.Id">@d.DriverCode &mdash; @d.FullName</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Customer</label>
+                        <InputSelect class="form-select" @bind-Value="_model.CustomerId">
+                            <option value="">— None (internal / repositioning) —</option>
+                            @foreach (var c in _customers)
+                            {
+                                <option value="@c.Id">@c.CustomerCode &mdash; @c.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Origin *</label>
+                        <InputText class="form-control" @bind-Value="_model.Origin" />
+                        <ValidationMessage For="() => _model.Origin" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Destination *</label>
+                        <InputText class="form-control" @bind-Value="_model.Destination" />
+                        <ValidationMessage For="() => _model.Destination" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Status *</label>
+                        <InputSelect class="form-select" @bind-Value="_model.Status">
+                            @foreach (var s in Enum.GetValues<TripStatus>())
+                            {
+                                <option value="@s">@s.ToDisplayName()</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Start Date *</label>
+                        <InputDate class="form-control" @bind-Value="_model.StartDate" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">End Date</label>
+                        <InputDate class="form-control" @bind-Value="_model.EndDate" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Revenue</label>
+                        <InputNumber class="form-control" @bind-Value="_model.Revenue" />
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Notes</label>
+                        <InputText class="form-control" @bind-Value="_model.Notes" />
+                    </div>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Vehicle *</label>
-                    <InputSelect class="form-select" @bind-Value="_model.VehicleId">
-                        <option value="0">Select a vehicle...</option>
-                        @foreach (var v in _vehicles)
-                        {
-                            <option value="@v.Id">@v.VehicleCode &mdash; @v.RegistrationNumber</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Driver *</label>
-                    <InputSelect class="form-select" @bind-Value="_model.DriverId">
-                        <option value="0">Select a driver...</option>
-                        @foreach (var d in _drivers)
-                        {
-                            <option value="@d.Id">@d.DriverCode &mdash; @d.FullName</option>
-                        }
-                    </InputSelect>
+            </div></div>
+        }
+        else if (_activeTab == "Expenses" && _detail is not null)
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Trip Expenses</h5>
+
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Category</label>
+                        <select class="form-select" @bind="_newExpense.Category">
+                            @foreach (var c in Enum.GetValues<TripExpenseCategory>())
+                            {
+                                <option value="@c">@c.ToDisplayName()</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Amount</label>
+                        <input type="number" step="0.01" class="form-control" @bind="_newExpense.Amount" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control" @bind="_newExpense.Date" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Paid By</label>
+                        <select class="form-select" @bind="_newExpense.PaidBy">
+                            @foreach (var p in Enum.GetValues<ExpensePaidBy>())
+                            {
+                                <option value="@p">@p.ToDisplayName()</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Receipt #</label>
+                        <input class="form-control" @bind="_newExpense.ReceiptNumber" />
+                    </div>
+                    <div class="col-md-1 d-grid">
+                        <button type="button" class="btn btn-primary" @onclick="AddExpense"><i class="bi bi-plus-lg"></i></button>
+                    </div>
                 </div>
 
-                <div class="col-md-4">
-                    <label class="form-label">Customer</label>
-                    <InputSelect class="form-select" @bind-Value="_model.CustomerId">
-                        <option value="">— None (internal / repositioning) —</option>
-                        @foreach (var c in _customers)
-                        {
-                            <option value="@c.Id">@c.CustomerCode &mdash; @c.Name</option>
-                        }
-                    </InputSelect>
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">Origin *</label>
-                    <InputText class="form-control" @bind-Value="_model.Origin" />
-                    <ValidationMessage For="() => _model.Origin" />
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Destination *</label>
-                    <InputText class="form-control" @bind-Value="_model.Destination" />
-                    <ValidationMessage For="() => _model.Destination" />
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Status *</label>
-                    <InputSelect class="form-select" @bind-Value="_model.Status">
-                        @foreach (var s in Enum.GetValues<TripStatus>())
-                        {
-                            <option value="@s">@s.ToDisplayName()</option>
-                        }
-                    </InputSelect>
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">Start Date *</label>
-                    <InputDate class="form-control" @bind-Value="_model.StartDate" />
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">End Date</label>
-                    <InputDate class="form-control" @bind-Value="_model.EndDate" />
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Revenue</label>
-                    <InputNumber class="form-control" @bind-Value="_model.Revenue" />
-                </div>
-
-                <div class="col-md-12">
-                    <label class="form-label">Notes</label>
-                    <InputText class="form-control" @bind-Value="_model.Notes" />
-                </div>
-            </div>
-        </div></div>
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Date</th><th>Category</th><th>Paid By</th><th>Receipt #</th><th class="text-end">Amount</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var e in _detail.Expenses)
+                    {
+                        <tr>
+                            <td>@e.Date.ToString("dd-MMM-yyyy")</td>
+                            <td>@e.Category.ToDisplayName()</td>
+                            <td>@e.PaidBy.ToDisplayName()</td>
+                            <td>@(string.IsNullOrWhiteSpace(e.ReceiptNumber) ? "—" : e.ReceiptNumber)</td>
+                            <td class="text-end">@e.Amount.ToString("N2")</td>
+                            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteExpense(e.Id)"><i class="bi bi-trash"></i></button></td>
+                        </tr>
+                    }
+                    @if (_detail.Expenses.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-muted small">No expenses recorded yet.</td></tr>
+                    }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="4" class="text-end">Expenses Total</th>
+                            <th class="text-end">@_detail.ExpensesTotal.ToString("N2")</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div></div>
+        }
+        else if (_activeTab == "P&L" && _detail is not null)
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Profit &amp; Loss</h5>
+                <div class="text-muted small mb-3">Live figures from this trip's revenue, its linked fuel entries, and its expenses. Driver pay is included once the Payroll module is added.</div>
+                <table class="table table-sm w-auto">
+                    <tbody>
+                        <tr><td>Revenue</td><td class="text-end">@_detail.RevenueAmount.ToString("N2")</td></tr>
+                        <tr><td>Less: Fuel</td><td class="text-end text-danger">(@_detail.FuelCost.ToString("N2"))</td></tr>
+                        <tr><td>Less: Expenses</td><td class="text-end text-danger">(@_detail.ExpensesTotal.ToString("N2"))</td></tr>
+                        <tr><td>Less: Driver Pay</td><td class="text-end text-danger">(@_detail.DriverPay.ToString("N2"))</td></tr>
+                        <tr class="fw-bold border-top">
+                            <td>Net Profit</td>
+                            <td class="text-end @(_detail.NetProfit >= 0 ? "text-success" : "text-danger")">@_detail.NetProfit.ToString("N2")</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <a class="btn btn-sm btn-outline-secondary" href="/fuel-entries?tripId=@_detail.Id" target="_blank">
+                    <i class="bi bi-fuel-pump me-1"></i>View fuel entries for this trip
+                </a>
+            </div></div>
+        }
 
         <div class="mt-3 d-flex gap-2">
             <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@(IsNew ? "Create Trip" : "Save Changes")</button>
@@ -132,6 +239,9 @@ else
 
     private bool IsNew => Id is null;
 
+    private static readonly string[] Tabs = { "Trip Details", "Expenses", "P&L" };
+    private string _activeTab = "Trip Details";
+
     private bool _loading = true;
     private string? _error;
     private string? _message;
@@ -141,6 +251,15 @@ else
     private List<VehicleListItemDto> _vehicles = new();
     private List<DriverListItemDto> _drivers = new();
     private List<CustomerListItemDto> _customers = new();
+
+    private TripExpenseUpsertDto _newExpense = NewExpense();
+
+    private static TripExpenseUpsertDto NewExpense() => new()
+    {
+        Category = TripExpenseCategory.Toll,
+        PaidBy = ExpensePaidBy.Company,
+        Date = DateOnly.FromDateTime(DateTime.Today)
+    };
 
     protected override async Task OnParametersSetAsync()
     {
@@ -213,6 +332,46 @@ else
         catch (Exception ex)
         {
             _error = $"Failed to save trip: {ex.Message}";
+        }
+    }
+
+    // ----- Expenses -----
+
+    private async Task AddExpense()
+    {
+        if (_detail is null) return;
+        if (_newExpense.Amount <= 0)
+        {
+            _error = "Enter an amount greater than zero.";
+            return;
+        }
+        try
+        {
+            await Api.CreateTripExpenseAsync(_detail.Id, _newExpense);
+            _newExpense = NewExpense();
+            await LoadAsync();
+            _activeTab = "Expenses";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add expense: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteExpense(int expenseId)
+    {
+        if (_detail is null) return;
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Delete this expense?");
+        if (!confirmed) return;
+        try
+        {
+            await Api.DeleteTripExpenseAsync(_detail.Id, expenseId);
+            await LoadAsync();
+            _activeTab = "Expenses";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete expense: {ex.Message}";
         }
     }
 }

@@ -26,6 +26,7 @@ public class FleetDbContext : DbContext
     public DbSet<WorkOrderItem> WorkOrderItems => Set<WorkOrderItem>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<FuelEntry> FuelEntries => Set<FuelEntry>();
+    public DbSet<TripExpense> TripExpenses => Set<TripExpense>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -146,6 +147,16 @@ public class FleetDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(t => t.CustomerId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasMany(t => t.Expenses)
+                .WithOne(e => e.Trip)
+                .HasForeignKey(e => e.TripId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TripExpense>(entity =>
+        {
+            entity.Property(e => e.Amount).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<WorkOrder>(entity =>

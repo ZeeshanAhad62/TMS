@@ -151,3 +151,21 @@ public enum FuelPaymentMode
     FuelCard,
     Credit
 }
+
+public enum TripExpenseCategory
+{
+    Toll,
+    Parking,
+    LoadingUnloading,
+    DriverAllowance,
+    EnRouteRepair,
+    Fine,
+    Weighbridge,
+    Misc
+}
+
+public enum ExpensePaidBy
+{
+    Company,
+    Driver
+}

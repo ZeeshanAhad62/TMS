@@ -298,6 +298,36 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Trip Expenses -----
+
+    public async Task<List<TripExpenseDto>> GetTripExpensesAsync(int tripId)
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<List<TripExpenseDto>>($"api/trips/{tripId}/expenses", JsonOptions) ?? new();
+    }
+
+    public async Task<TripExpenseDto> CreateTripExpenseAsync(int tripId, TripExpenseUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/trips/{tripId}/expenses", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<TripExpenseDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateTripExpenseAsync(int tripId, int expenseId, TripExpenseUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/trips/{tripId}/expenses/{expenseId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteTripExpenseAsync(int tripId, int expenseId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/trips/{tripId}/expenses/{expenseId}");
+        await EnsureSuccess(response);
+    }
+
     // ----- Customers -----
 
     public async Task<List<CustomerListItemDto>> GetCustomersAsync(CustomerStatus? status = null, string? search = null)

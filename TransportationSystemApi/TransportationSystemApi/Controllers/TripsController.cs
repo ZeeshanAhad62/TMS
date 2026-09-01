@@ -63,9 +63,15 @@ public class TripsController : ControllerBase
             .Include(t => t.Vehicle)
             .Include(t => t.Driver)
             .Include(t => t.Customer)
+            .Include(t => t.Expenses)
             .FirstOrDefaultAsync(t => t.Id == id);
         if (trip is null) return NotFound();
-        return TripMapper.ToDetailDto(trip);
+
+        var fuelCost = await _db.FuelEntries
+            .Where(f => f.TripId == id)
+            .SumAsync(f => (decimal?)f.TotalCost) ?? 0m;
+
+        return TripMapper.ToDetailDto(trip, fuelCost);
     }
 
     [HttpPost]
@@ -93,7 +99,7 @@ public class TripsController : ControllerBase
         trip.TripCode = $"TRP-{trip.Id:D5}";
         await _db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetById), new { id = trip.Id }, TripMapper.ToDetailDto(trip));
+        return CreatedAtAction(nameof(GetById), new { id = trip.Id }, TripMapper.ToDetailDto(trip, 0m));
     }
 
     [HttpPut("{id:int}")]

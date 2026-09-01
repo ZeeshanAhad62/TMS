@@ -57,7 +57,7 @@ Rationale: turn the app from record-keeping into an operations-and-money system.
 
 - [x] **1. Customer / Client Master** — done. Master CRUD (`006`, commit `e757dc8`) + `Trip.CustomerId` link (`007`, commit `e91ae4e`).
 - [x] **2. Fuel Management** — done. `dbo.FuelEntries` (`008`), mileage / cost-per-km derived at read time, dashboard section. Optional `FuelStation` master deferred (free-text `StationName` for now).
-- [ ] **3. Trip Expenses + per-trip P&L** — extends the Trip module. Fuel line can now pull from `FuelEntry.TotalCost` where `TripId` matches.
+- [x] **3. Trip Expenses + per-trip P&L** — done. `dbo.TripExpenses` child of Trips (`009`), nested `api/trips/{id}/expenses` CRUD, P&L folded into trip detail DTO (revenue − fuel − expenses − driver-pay; driver-pay stays 0 until module 8), tabbed Trip editor (Details / Expenses / P&L). Not yet: profitability columns on the Trip **list** and Reports section (see cross-cutting).
 - [ ] **4. Billing & Invoicing (A/R)** — needs #1 and #3.
 
 ### Tier 2 — strongly expected
@@ -227,7 +227,7 @@ Rationale: turn the app from record-keeping into an operations-and-money system.
 - [ ] Map/JS library baseline (Leaflet) — first needed by #9.
 - [ ] Background/hosted service host — first needed by #5.
 - [ ] Consolidated `EnumDisplay` entries for every new enum.
-- [ ] Extend `ReportsController` summary + `ReportsDashboard.razor` as each money module lands. **Owed:** a Fuel section (month spend, fleet avg mileage, cost/km by vehicle, top spenders) — not yet added after module 2.
+- [ ] Extend `ReportsController` summary + `ReportsDashboard.razor` as each money module lands. **Owed:** (a) a Fuel section (month spend, fleet avg mileage, cost/km by vehicle, top spenders) — not added after module 2; (b) a Trip P&L section (most/least profitable trips, profit by customer, profit by vehicle) + `NetProfit` column on the Trip list — not added after module 3.
 - [ ] Retire dead `ComingSoon.razor` + `/modules/coming-soon/{slug}` route once no longer referenced.
 
 ---
@@ -239,4 +239,5 @@ Rationale: turn the app from record-keeping into an operations-and-money system.
 | 2026-09-01 | Roadmap created | — | This document. |
 | 2026-09-01 | Customer Master (CRUD) | `e757dc8` | `dbo.Customers` (migration 006, applied to dev DB). `Customer` model + `CustomerStatus` enum, `CustomerDtos`, `CustomerMapper`, `CustomersController` (`api/customers`), `FleetApiClient` methods, `Customers/CustomerList.razor` + `CustomerEditor.razor` (single card), sidebar nav, Home dashboard section. Full CRUD + search + validation verified via API. |
 | 2026-09-01 | Trip ↔ Customer link | `e91ae4e` | Migration 007: nullable `dbo.Trips.CustomerId` → `Customers`, `ON DELETE SET NULL`. `TripUpsertDto.CustomerId`, `CustomerName` on DTOs, `customerId` filter, TripEditor picker + TripList column/filter. Verified: customerName flows through; deleting a customer nulls its trips' CustomerId. **Module 1 complete.** |
+| 2026-09-01 | Trip Expenses + P&L | `<pending>` | Migration 009: `dbo.TripExpenses` (child of Trips, `ON DELETE CASCADE`). `TripExpense` model + `TripExpenseCategory` / `ExpensePaidBy` enums. `TripExpensesController` (`api/trips/{tripId}/expenses`, mirrors `WorkOrderItemsController`). `TripMapper.ToDetailDto` now takes `fuelCost` and returns `RevenueAmount` / `FuelCost` / `ExpensesTotal` / `DriverPay` (0) / `NetProfit` + `Expenses[]`; `TripsController.GetById` sums `FuelEntries` where `TripId` matches. `TripEditor.razor` rebuilt as tabbed (Trip Details / Expenses / P&L); `FuelEntryList.razor` gained a `?tripId=` filter. Verified via API: P&L math (100000 − 25400 fuel − 6000 exp = 68600), expense CRUD + recalc, validation 400, missing-trip 404, trip delete cascades expenses and detaches fuel. Dev DB clean. |
 | 2026-09-01 | Fuel Management | `7127afe` | `dbo.FuelEntries` (migration 008, applied to dev DB). `FuelEntry` model + `FuelPaymentMode` enum; `TotalCost` = Litres × Rate recomputed server-side; `DistanceSinceLast` / `Mileage` (km/L) / `CostPerKm` derived at read time from the previous fill, mileage only full-tank→full-tank. `FuelEntriesController` (`api/fuel-entries`, filters vehicle/driver/trip/fuelType/from/to/search). FK note: `TripId` is `ON DELETE NO ACTION` (avoids multi-cascade-path); `TripsController` + `VehiclesController` null `FuelEntries.TripId` before deleting. `Fuel/FuelEntryList.razor` (mileage + variance badge + KPI tiles) + `FuelEntryEditor.razor` (single card, live total). Nav + Home section (month spend, fleet avg mileage, low-mileage count, recent fills). Verified via API: CRUD, mileage math (400 km / 40 L = 10 km/L, cost/km 28.5), partial-fill excluded, validation 400/404, trip-detach on delete. Dev DB clean. |
