@@ -254,12 +254,13 @@ public class FleetApiClient
 
     // ----- Trips -----
 
-    public async Task<List<TripListItemDto>> GetTripsAsync(int? vehicleId = null, int? driverId = null, TripStatus? status = null, string? search = null)
+    public async Task<List<TripListItemDto>> GetTripsAsync(int? vehicleId = null, int? driverId = null, TripStatus? status = null, string? search = null, int? customerId = null)
     {
         await AuthorizeAsync();
         var query = new List<string>();
         if (vehicleId.HasValue) query.Add($"vehicleId={vehicleId}");
         if (driverId.HasValue) query.Add($"driverId={driverId}");
+        if (customerId.HasValue) query.Add($"customerId={customerId}");
         if (status.HasValue) query.Add($"status={status}");
         if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
         var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";

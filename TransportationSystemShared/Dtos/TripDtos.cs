@@ -10,6 +10,7 @@ public class TripListItemDto
     public string VehicleCode { get; set; } = string.Empty;
     public string VehicleRegistrationNumber { get; set; } = string.Empty;
     public string DriverName { get; set; } = string.Empty;
+    public string? CustomerName { get; set; }
     public string Origin { get; set; } = string.Empty;
     public string Destination { get; set; } = string.Empty;
     public DateOnly StartDate { get; set; }
@@ -27,6 +28,7 @@ public class TripDetailDto : TripUpsertDto
     public string VehicleCode { get; set; } = string.Empty;
     public string VehicleRegistrationNumber { get; set; } = string.Empty;
     public string DriverName { get; set; } = string.Empty;
+    public string? CustomerName { get; set; }
 }
 
 public class TripUpsertDto
@@ -36,6 +38,8 @@ public class TripUpsertDto
 
     [Required]
     public int DriverId { get; set; }
+
+    public int? CustomerId { get; set; }
 
     [Required, MaxLength(150)]
     public string Origin { get; set; } = string.Empty;

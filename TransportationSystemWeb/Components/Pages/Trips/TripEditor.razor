@@ -70,6 +70,17 @@ else
                 </div>
 
                 <div class="col-md-4">
+                    <label class="form-label">Customer</label>
+                    <InputSelect class="form-select" @bind-Value="_model.CustomerId">
+                        <option value="">— None (internal / repositioning) —</option>
+                        @foreach (var c in _customers)
+                        {
+                            <option value="@c.Id">@c.CustomerCode &mdash; @c.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-md-4">
                     <label class="form-label">Origin *</label>
                     <InputText class="form-control" @bind-Value="_model.Origin" />
                     <ValidationMessage For="() => _model.Origin" />
@@ -129,6 +140,7 @@ else
     private TripDetailDto? _detail;
     private List<VehicleListItemDto> _vehicles = new();
     private List<DriverListItemDto> _drivers = new();
+    private List<CustomerListItemDto> _customers = new();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -143,6 +155,7 @@ else
         {
             _vehicles = await Api.GetVehiclesAsync();
             _drivers = await Api.GetDriversAsync();
+            _customers = await Api.GetCustomersAsync();
 
             if (Id.HasValue)
             {

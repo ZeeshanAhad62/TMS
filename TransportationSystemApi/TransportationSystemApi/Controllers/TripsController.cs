@@ -22,16 +22,24 @@ public class TripsController : ControllerBase
     public async Task<ActionResult<List<TripListItemDto>>> GetAll(
         [FromQuery] int? vehicleId,
         [FromQuery] int? driverId,
+        [FromQuery] int? customerId,
         [FromQuery] TripStatus? status,
         [FromQuery] string? search)
     {
-        var query = _db.Trips.AsNoTracking().Include(t => t.Vehicle).Include(t => t.Driver).AsQueryable();
+        var query = _db.Trips.AsNoTracking()
+            .Include(t => t.Vehicle)
+            .Include(t => t.Driver)
+            .Include(t => t.Customer)
+            .AsQueryable();
 
         if (vehicleId.HasValue)
             query = query.Where(t => t.VehicleId == vehicleId.Value);
 
         if (driverId.HasValue)
             query = query.Where(t => t.DriverId == driverId.Value);
+
+        if (customerId.HasValue)
+            query = query.Where(t => t.CustomerId == customerId.Value);
 
         if (status.HasValue)
             query = query.Where(t => t.Status == status.Value);
@@ -51,7 +59,11 @@ public class TripsController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<TripDetailDto>> GetById(int id)
     {
-        var trip = await _db.Trips.Include(t => t.Vehicle).Include(t => t.Driver).FirstOrDefaultAsync(t => t.Id == id);
+        var trip = await _db.Trips
+            .Include(t => t.Vehicle)
+            .Include(t => t.Driver)
+            .Include(t => t.Customer)
+            .FirstOrDefaultAsync(t => t.Id == id);
         if (trip is null) return NotFound();
         return TripMapper.ToDetailDto(trip);
     }
@@ -65,7 +77,14 @@ public class TripsController : ControllerBase
         var driver = await _db.Drivers.FindAsync(dto.DriverId);
         if (driver is null) return NotFound("Driver not found.");
 
-        var trip = new Trip { Vehicle = vehicle, Driver = driver };
+        Customer? customer = null;
+        if (dto.CustomerId.HasValue)
+        {
+            customer = await _db.Customers.FindAsync(dto.CustomerId.Value);
+            if (customer is null) return NotFound("Customer not found.");
+        }
+
+        var trip = new Trip { Vehicle = vehicle, Driver = driver, Customer = customer };
         TripMapper.ApplyUpsert(trip, dto);
 
         _db.Trips.Add(trip);
@@ -85,6 +104,8 @@ public class TripsController : ControllerBase
 
         if (!await _db.Vehicles.AnyAsync(v => v.Id == dto.VehicleId)) return NotFound("Vehicle not found.");
         if (!await _db.Drivers.AnyAsync(d => d.Id == dto.DriverId)) return NotFound("Driver not found.");
+        if (dto.CustomerId.HasValue && !await _db.Customers.AnyAsync(c => c.Id == dto.CustomerId.Value))
+            return NotFound("Customer not found.");
 
         TripMapper.ApplyUpsert(trip, dto);
         trip.UpdatedAt = DateTime.UtcNow;

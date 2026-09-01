@@ -140,6 +140,11 @@ public class FleetDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(t => t.DriverId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(t => t.Customer)
+                .WithMany()
+                .HasForeignKey(t => t.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<WorkOrder>(entity =>
