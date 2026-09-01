@@ -297,6 +297,49 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Customers -----
+
+    public async Task<List<CustomerListItemDto>> GetCustomersAsync(CustomerStatus? status = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (status.HasValue) query.Add($"status={status}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+
+        return await _http.GetFromJsonAsync<List<CustomerListItemDto>>($"api/customers{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<CustomerDetailDto?> GetCustomerAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/customers/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<CustomerDetailDto>(JsonOptions);
+    }
+
+    public async Task<CustomerDetailDto> CreateCustomerAsync(CustomerUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/customers", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<CustomerDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateCustomerAsync(int id, CustomerUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/customers/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteCustomerAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/customers/{id}");
+        await EnsureSuccess(response);
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

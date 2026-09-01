@@ -24,6 +24,7 @@ public class FleetDbContext : DbContext
     public DbSet<Trip> Trips => Set<Trip>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<WorkOrderItem> WorkOrderItems => Set<WorkOrderItem>();
+    public DbSet<Customer> Customers => Set<Customer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -162,6 +163,12 @@ public class FleetDbContext : DbContext
         {
             entity.Property(i => i.Quantity).HasPrecision(18, 2);
             entity.Property(i => i.UnitCost).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<Customer>(entity =>
+        {
+            entity.HasIndex(c => c.CustomerCode).IsUnique();
+            entity.Property(c => c.CreditLimit).HasPrecision(18, 2);
         });
     }
 }

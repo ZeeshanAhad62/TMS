@@ -13,6 +13,7 @@
     <div class="d-flex gap-2">
         <a class="btn btn-outline-primary btn-sm" href="/fleet-vehicles"><i class="bi bi-truck me-1"></i>Fleet Master</a>
         <a class="btn btn-outline-primary btn-sm" href="/drivers"><i class="bi bi-person-badge me-1"></i>Driver Master</a>
+        <a class="btn btn-outline-primary btn-sm" href="/customers"><i class="bi bi-people me-1"></i>Customer Master</a>
         <a class="btn btn-outline-primary btn-sm" href="/trips"><i class="bi bi-calendar-check me-1"></i>Trip List</a>
         <a class="btn btn-outline-primary btn-sm" href="/workorders"><i class="bi bi-tools me-1"></i>Work Orders</a>
     </div>
@@ -23,7 +24,7 @@
     <div class="alert alert-danger">@_error</div>
 }
 
-@if (_vehicles is null || _drivers is null || _trips is null || _workOrders is null)
+@if (_vehicles is null || _drivers is null || _trips is null || _workOrders is null || _customers is null)
 {
     <p><em>Loading...</em></p>
 }
@@ -269,6 +270,75 @@ else
                     <div class="card stat-card h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Total Customers</div>
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-people"></i></div>
+                            </div>
+                            <div class="stat-value">@TotalCustomers</div>
+                            <div class="stat-sub text-success"><i class="bi bi-check-circle me-1"></i>@ActiveCustomerCount active</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Inactive Customers</div>
+                                <div class="stat-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-person-dash"></i></div>
+                            </div>
+                            <div class="stat-value">@InactiveCustomerCount</div>
+                            <div class="stat-sub text-muted">Not currently trading</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Credit Limit Set</div>
+                                <div class="stat-icon bg-warning bg-opacity-25 text-warning-emphasis"><i class="bi bi-cash-stack"></i></div>
+                            </div>
+                            <div class="stat-value">@CustomersWithCreditLimit</div>
+                            <div class="stat-sub text-muted">@TotalCreditExtended.ToString("N0") total limit</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="mb-3">Recently Added Customers</h6>
+                    @if (!RecentCustomers.Any())
+                    {
+                        <div class="text-muted small">No customers yet.</div>
+                    }
+                    else
+                    {
+                        @foreach (var c in RecentCustomers)
+                        {
+                            <div class="side-list-row">
+                                <div class="side-list-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-person-vcard"></i></div>
+                                <div class="flex-grow-1 text-truncate">
+                                    <div class="font-monospace small">@c.CustomerCode</div>
+                                    <div class="text-muted" style="font-size:0.75rem;">@c.Name</div>
+                                </div>
+                                <span class="badge @(c.Status == CustomerStatus.Active ? "bg-success" : "bg-secondary")">@c.Status.ToDisplayName()</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-lg-8">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
                                 <div class="stat-label">Total Trips</div>
                                 <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-calendar-check"></i></div>
                             </div>
@@ -406,6 +476,7 @@ else
     private List<DriverListItemDto>? _drivers;
     private List<TripListItemDto>? _trips;
     private List<WorkOrderListItemDto>? _workOrders;
+    private List<CustomerListItemDto>? _customers;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -418,6 +489,7 @@ else
             _drivers = await Api.GetDriversAsync();
             _trips = await Api.GetTripsAsync();
             _workOrders = await Api.GetWorkOrdersAsync();
+            _customers = await Api.GetCustomersAsync();
         }
         catch (Exception ex)
         {
@@ -426,6 +498,7 @@ else
             _drivers ??= new();
             _trips ??= new();
             _workOrders ??= new();
+            _customers ??= new();
         }
     }
 
@@ -468,6 +541,18 @@ else
         (_drivers ?? new())
             .Where(d => d.LicenseExpiryDate.HasValue)
             .OrderBy(d => d.LicenseExpiryDate)
+            .Take(5)
+            .ToList();
+
+    private int TotalCustomers => _customers?.Count ?? 0;
+    private int ActiveCustomerCount => _customers?.Count(c => c.Status == CustomerStatus.Active) ?? 0;
+    private int InactiveCustomerCount => _customers?.Count(c => c.Status == CustomerStatus.Inactive) ?? 0;
+    private int CustomersWithCreditLimit => _customers?.Count(c => c.CreditLimit.HasValue && c.CreditLimit.Value > 0) ?? 0;
+    private decimal TotalCreditExtended => (_customers ?? new()).Where(c => c.CreditLimit.HasValue).Sum(c => c.CreditLimit!.Value);
+
+    private List<CustomerListItemDto> RecentCustomers =>
+        (_customers ?? new())
+            .OrderByDescending(c => c.Id)
             .Take(5)
             .ToList();
 

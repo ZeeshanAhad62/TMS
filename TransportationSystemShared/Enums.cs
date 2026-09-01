@@ -138,3 +138,9 @@ public enum AssignmentStatus
     Completed,
     Cancelled
 }
+
+public enum CustomerStatus
+{
+    Active,
+    Inactive
+}

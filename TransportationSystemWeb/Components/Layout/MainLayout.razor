@@ -53,6 +53,15 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @(SubLinkClass("/customers") == "active" ? "active-module" : "")" title="Customer Management">
+                    <i class="bi bi-people"></i> <span class="nav-text">Customer Management</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/customers")" href="/customers" title="Customer Master">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Customer Master</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/trips") == "active" ? "active-module" : "")" title="Trip / Booking">
                     <i class="bi bi-calendar-check"></i> <span class="nav-text">Trip / Booking</span>
                 </div>
