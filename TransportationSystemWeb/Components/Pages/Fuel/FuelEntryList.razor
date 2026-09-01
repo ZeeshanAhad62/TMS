@@ -1,0 +1,231 @@
+@page "/fuel-entries"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Fuel Management</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Fuel Management</h2>
+        <div class="text-muted small">Fuel Management &rsaquo; Fuel Log</div>
+    </div>
+    <a class="btn btn-primary" href="/fuel-entries/new">
+        <i class="bi bi-plus-lg me-1"></i>Add Fuel Entry
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <input class="form-control" placeholder="Search code, station, slip..."
+                       @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_vehicleFilter">
+                    <option value="">All vehicles</option>
+                    @foreach (var v in _vehicles)
+                    {
+                        <option value="@v.Id">@v.VehicleCode &mdash; @v.RegistrationNumber</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" @bind="_fuelTypeFilter">
+                    <option value="">All fuel types</option>
+                    @foreach (var t in Enum.GetValues<FuelType>())
+                    {
+                        <option value="@t">@t.ToDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="date" class="form-control" @bind="_from" title="From date" />
+            </div>
+            <div class="col-md-2">
+                <input type="date" class="form-control" @bind="_to" title="To date" />
+            </div>
+        </div>
+        <div class="row g-2 mt-1">
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-outline-secondary" @onclick="Load"><i class="bi bi-funnel me-1"></i>Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_entries is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <div class="card stat-card"><div class="card-body">
+                <div class="stat-label">Entries</div>
+                <div class="stat-value">@_entries.Count</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card"><div class="card-body">
+                <div class="stat-label">Total Litres</div>
+                <div class="stat-value">@_entries.Sum(e => e.Litres).ToString("N0")</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card"><div class="card-body">
+                <div class="stat-label">Total Spend</div>
+                <div class="stat-value">@_entries.Sum(e => e.TotalCost).ToString("N0")</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card"><div class="card-body">
+                <div class="stat-label">Avg Mileage (km/L)</div>
+                <div class="stat-value">@(AvgMileage?.ToString("0.00") ?? "—")</div>
+            </div></div>
+        </div>
+    </div>
+
+    @if (_entries.Count == 0)
+    {
+        <div class="alert alert-info">No fuel entries found. Click "Add Fuel Entry" to log the first fill.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover bg-white align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Code</th><th>Date</th><th>Vehicle</th><th>Driver</th>
+                        <th class="text-end">Odometer</th><th class="text-end">Litres</th>
+                        <th class="text-end">Rate</th><th class="text-end">Total</th>
+                        <th class="text-end">Distance</th><th class="text-end">km/L</th><th class="text-end">Cost/km</th>
+                        <th>Payment</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in _entries)
+                    {
+                        <tr>
+                            <td class="font-monospace">@e.FuelEntryCode</td>
+                            <td>@e.Date.ToString("dd-MMM-yyyy")</td>
+                            <td>@e.VehicleCode<br /><span class="text-muted small">@e.VehicleRegistrationNumber</span></td>
+                            <td>@(string.IsNullOrWhiteSpace(e.DriverName) ? "—" : e.DriverName)</td>
+                            <td class="text-end">@e.OdometerReading.ToString("N0") @(e.IsTankFull ? "" : "*")</td>
+                            <td class="text-end">@e.Litres.ToString("0.0")</td>
+                            <td class="text-end">@e.RatePerLitre.ToString("0.00")</td>
+                            <td class="text-end">@e.TotalCost.ToString("N0")</td>
+                            <td class="text-end">@(e.DistanceSinceLast?.ToString("N0") ?? "—")</td>
+                            <td class="text-end">
+                                @if (e.Mileage.HasValue)
+                                {
+                                    <span class="badge @MileageBadgeClass(e)">@e.Mileage.Value.ToString("0.00")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td class="text-end">@(e.CostPerKm?.ToString("0.00") ?? "—")</td>
+                            <td>@e.PaymentMode.ToDisplayName()</td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-outline-primary" href="/fuel-entries/@e.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(e.Id)" title="Delete entry">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="text-muted small">* = partial fill (not tank-full). Mileage &amp; cost/km are shown only between two consecutive tank-full fills.</div>
+    }
+}
+
+@code {
+    private List<FuelEntryListItemDto>? _entries;
+    private List<VehicleListItemDto> _vehicles = new();
+    private string _search = "";
+    private string _vehicleFilter = "";
+    private string _fuelTypeFilter = "";
+    private DateTime? _from;
+    private DateTime? _to;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vehicles = await Api.GetVehiclesAsync();
+        await Load();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            int? vehicleId = string.IsNullOrEmpty(_vehicleFilter) ? null : int.Parse(_vehicleFilter);
+            FuelType? fuelType = string.IsNullOrEmpty(_fuelTypeFilter) ? null : Enum.Parse<FuelType>(_fuelTypeFilter);
+            DateOnly? from = _from.HasValue ? DateOnly.FromDateTime(_from.Value) : null;
+            DateOnly? to = _to.HasValue ? DateOnly.FromDateTime(_to.Value) : null;
+            _entries = await Api.GetFuelEntriesAsync(vehicleId, null, null, fuelType, from, to, _search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load fuel entries: {ex.Message}";
+            _entries = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Delete this fuel entry?");
+        if (!confirmed) return;
+
+        try
+        {
+            await Api.DeleteFuelEntryAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete fuel entry: {ex.Message}";
+        }
+    }
+
+    private decimal? AvgMileage
+    {
+        get
+        {
+            var withMileage = (_entries ?? new()).Where(e => e.Mileage.HasValue).Select(e => e.Mileage!.Value).ToList();
+            return withMileage.Count == 0 ? null : Math.Round(withMileage.Average(), 2);
+        }
+    }
+
+    // Flags an entry whose mileage is noticeably below that vehicle's average in the current view.
+    private string MileageBadgeClass(FuelEntryListItemDto e)
+    {
+        var vehicleAvg = (_entries ?? new())
+            .Where(x => x.VehicleCode == e.VehicleCode && x.Mileage.HasValue)
+            .Select(x => x.Mileage!.Value)
+            .DefaultIfEmpty()
+            .Average();
+
+        if (vehicleAvg > 0 && e.Mileage!.Value < vehicleAvg * 0.85m) return "bg-danger";
+        if (vehicleAvg > 0 && e.Mileage!.Value < vehicleAvg * 0.95m) return "bg-warning text-dark";
+        return "bg-success";
+    }
+}

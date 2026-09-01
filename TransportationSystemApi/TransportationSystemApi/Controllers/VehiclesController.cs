@@ -93,6 +93,12 @@ public class VehiclesController : ControllerBase
         var vehicle = await _db.Vehicles.FindAsync(id);
         if (vehicle is null) return NotFound();
 
+        // FuelEntries.TripId uses ON DELETE NO ACTION (see migration 008). Deleting
+        // the vehicle cascades into both Trips and FuelEntries; detach fuel entries
+        // from their trips first so the trip cascade has no blocking references.
+        await _db.FuelEntries.Where(f => f.VehicleId == id && f.TripId != null)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.TripId, (int?)null));
+
         _db.Vehicles.Remove(vehicle);
         await _db.SaveChangesAsync();
         return NoContent();

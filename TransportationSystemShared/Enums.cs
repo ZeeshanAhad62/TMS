@@ -144,3 +144,10 @@ public enum CustomerStatus
     Active,
     Inactive
 }
+
+public enum FuelPaymentMode
+{
+    Cash,
+    FuelCard,
+    Credit
+}

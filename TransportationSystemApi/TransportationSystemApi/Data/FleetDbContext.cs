@@ -25,6 +25,7 @@ public class FleetDbContext : DbContext
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<WorkOrderItem> WorkOrderItems => Set<WorkOrderItem>();
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<FuelEntry> FuelEntries => Set<FuelEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -174,6 +175,31 @@ public class FleetDbContext : DbContext
         {
             entity.HasIndex(c => c.CustomerCode).IsUnique();
             entity.Property(c => c.CreditLimit).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<FuelEntry>(entity =>
+        {
+            entity.HasIndex(f => f.FuelEntryCode).IsUnique();
+            entity.HasIndex(f => new { f.VehicleId, f.Date });
+            entity.Property(f => f.OdometerReading).HasPrecision(18, 2);
+            entity.Property(f => f.Litres).HasPrecision(18, 2);
+            entity.Property(f => f.RatePerLitre).HasPrecision(18, 2);
+            entity.Property(f => f.TotalCost).HasPrecision(18, 2);
+
+            entity.HasOne(f => f.Vehicle)
+                .WithMany()
+                .HasForeignKey(f => f.VehicleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(f => f.Driver)
+                .WithMany()
+                .HasForeignKey(f => f.DriverId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(f => f.Trip)
+                .WithMany()
+                .HasForeignKey(f => f.TripId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }

@@ -120,6 +120,11 @@ public class TripsController : ControllerBase
         var trip = await _db.Trips.FindAsync(id);
         if (trip is null) return NotFound();
 
+        // FuelEntries.TripId uses ON DELETE NO ACTION (see migration 008), so
+        // detach any fuel entries from this trip before removing it.
+        await _db.FuelEntries.Where(f => f.TripId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.TripId, (int?)null));
+
         _db.Trips.Remove(trip);
         await _db.SaveChangesAsync();
         return NoContent();

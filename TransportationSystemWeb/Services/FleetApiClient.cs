@@ -341,6 +341,56 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Fuel Entries -----
+
+    public async Task<List<FuelEntryListItemDto>> GetFuelEntriesAsync(
+        int? vehicleId = null, int? driverId = null, int? tripId = null,
+        FuelType? fuelType = null, DateOnly? from = null, DateOnly? to = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (vehicleId.HasValue) query.Add($"vehicleId={vehicleId}");
+        if (driverId.HasValue) query.Add($"driverId={driverId}");
+        if (tripId.HasValue) query.Add($"tripId={tripId}");
+        if (fuelType.HasValue) query.Add($"fuelType={fuelType}");
+        if (from.HasValue) query.Add($"from={from:yyyy-MM-dd}");
+        if (to.HasValue) query.Add($"to={to:yyyy-MM-dd}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+
+        return await _http.GetFromJsonAsync<List<FuelEntryListItemDto>>($"api/fuel-entries{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<FuelEntryDetailDto?> GetFuelEntryAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/fuel-entries/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<FuelEntryDetailDto>(JsonOptions);
+    }
+
+    public async Task<FuelEntryDetailDto> CreateFuelEntryAsync(FuelEntryUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/fuel-entries", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<FuelEntryDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateFuelEntryAsync(int id, FuelEntryUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/fuel-entries/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteFuelEntryAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/fuel-entries/{id}");
+        await EnsureSuccess(response);
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

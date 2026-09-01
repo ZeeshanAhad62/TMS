@@ -55,9 +55,9 @@ Rationale: turn the app from record-keeping into an operations-and-money system.
 
 ### Tier 1 — core (do first)
 
-- [~] **1. Customer / Client Master** — CRUD master **done** (migration `006`, committed). Remaining: add nullable `CustomerId` to `Trip`.
-- [ ] **2. Fuel Management** — highest operational value.
-- [ ] **3. Trip Expenses + per-trip P&L** — extends the Trip module.
+- [x] **1. Customer / Client Master** — done. Master CRUD (`006`, commit `e757dc8`) + `Trip.CustomerId` link (`007`, commit `e91ae4e`).
+- [x] **2. Fuel Management** — done. `dbo.FuelEntries` (`008`), mileage / cost-per-km derived at read time, dashboard section. Optional `FuelStation` master deferred (free-text `StationName` for now).
+- [ ] **3. Trip Expenses + per-trip P&L** — extends the Trip module. Fuel line can now pull from `FuelEntry.TotalCost` where `TripId` matches.
 - [ ] **4. Billing & Invoicing (A/R)** — needs #1 and #3.
 
 ### Tier 2 — strongly expected
@@ -227,7 +227,7 @@ Rationale: turn the app from record-keeping into an operations-and-money system.
 - [ ] Map/JS library baseline (Leaflet) — first needed by #9.
 - [ ] Background/hosted service host — first needed by #5.
 - [ ] Consolidated `EnumDisplay` entries for every new enum.
-- [ ] Extend `ReportsController` summary + `ReportsDashboard.razor` as each money module lands.
+- [ ] Extend `ReportsController` summary + `ReportsDashboard.razor` as each money module lands. **Owed:** a Fuel section (month spend, fleet avg mileage, cost/km by vehicle, top spenders) — not yet added after module 2.
 - [ ] Retire dead `ComingSoon.razor` + `/modules/coming-soon/{slug}` route once no longer referenced.
 
 ---
@@ -237,4 +237,6 @@ Rationale: turn the app from record-keeping into an operations-and-money system.
 | Date | Module | Commit | Notes |
 |---|---|---|---|
 | 2026-09-01 | Roadmap created | — | This document. |
-| 2026-09-01 | Customer Master (CRUD) | `e757dc8` | `dbo.Customers` (migration 006, applied to dev DB). `Customer` model + `CustomerStatus` enum, `CustomerDtos`, `CustomerMapper`, `CustomersController` (`api/customers`), `FleetApiClient` methods, `Customers/CustomerList.razor` + `CustomerEditor.razor` (single card), sidebar nav, Home dashboard section. Full CRUD + search + validation verified via API. Trip `CustomerId` link still to do. |
+| 2026-09-01 | Customer Master (CRUD) | `e757dc8` | `dbo.Customers` (migration 006, applied to dev DB). `Customer` model + `CustomerStatus` enum, `CustomerDtos`, `CustomerMapper`, `CustomersController` (`api/customers`), `FleetApiClient` methods, `Customers/CustomerList.razor` + `CustomerEditor.razor` (single card), sidebar nav, Home dashboard section. Full CRUD + search + validation verified via API. |
+| 2026-09-01 | Trip ↔ Customer link | `e91ae4e` | Migration 007: nullable `dbo.Trips.CustomerId` → `Customers`, `ON DELETE SET NULL`. `TripUpsertDto.CustomerId`, `CustomerName` on DTOs, `customerId` filter, TripEditor picker + TripList column/filter. Verified: customerName flows through; deleting a customer nulls its trips' CustomerId. **Module 1 complete.** |
+| 2026-09-01 | Fuel Management | `<pending>` | `dbo.FuelEntries` (migration 008, applied to dev DB). `FuelEntry` model + `FuelPaymentMode` enum; `TotalCost` = Litres × Rate recomputed server-side; `DistanceSinceLast` / `Mileage` (km/L) / `CostPerKm` derived at read time from the previous fill, mileage only full-tank→full-tank. `FuelEntriesController` (`api/fuel-entries`, filters vehicle/driver/trip/fuelType/from/to/search). FK note: `TripId` is `ON DELETE NO ACTION` (avoids multi-cascade-path); `TripsController` + `VehiclesController` null `FuelEntries.TripId` before deleting. `Fuel/FuelEntryList.razor` (mileage + variance badge + KPI tiles) + `FuelEntryEditor.razor` (single card, live total). Nav + Home section (month spend, fleet avg mileage, low-mileage count, recent fills). Verified via API: CRUD, mileage math (400 km / 40 L = 10 km/L, cost/km 28.5), partial-fill excluded, validation 400/404, trip-detach on delete. Dev DB clean. |

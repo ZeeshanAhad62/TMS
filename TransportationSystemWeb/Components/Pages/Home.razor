@@ -15,6 +15,7 @@
         <a class="btn btn-outline-primary btn-sm" href="/drivers"><i class="bi bi-person-badge me-1"></i>Driver Master</a>
         <a class="btn btn-outline-primary btn-sm" href="/customers"><i class="bi bi-people me-1"></i>Customer Master</a>
         <a class="btn btn-outline-primary btn-sm" href="/trips"><i class="bi bi-calendar-check me-1"></i>Trip List</a>
+        <a class="btn btn-outline-primary btn-sm" href="/fuel-entries"><i class="bi bi-fuel-pump me-1"></i>Fuel Log</a>
         <a class="btn btn-outline-primary btn-sm" href="/workorders"><i class="bi bi-tools me-1"></i>Work Orders</a>
     </div>
 </div>
@@ -24,7 +25,7 @@
     <div class="alert alert-danger">@_error</div>
 }
 
-@if (_vehicles is null || _drivers is null || _trips is null || _workOrders is null || _customers is null)
+@if (_vehicles is null || _drivers is null || _trips is null || _workOrders is null || _customers is null || _fuelEntries is null)
 {
     <p><em>Loading...</em></p>
 }
@@ -339,6 +340,75 @@ else
                     <div class="card stat-card h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Fuel Spend (This Month)</div>
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-fuel-pump"></i></div>
+                            </div>
+                            <div class="stat-value">@FuelSpendThisMonth.ToString("N0")</div>
+                            <div class="stat-sub text-muted">@FuelLitresThisMonth.ToString("N0") L filled</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Fleet Avg Mileage</div>
+                                <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-speedometer2"></i></div>
+                            </div>
+                            <div class="stat-value">@(FleetAvgMileage?.ToString("0.00") ?? "—")</div>
+                            <div class="stat-sub text-muted">km / litre (full-tank runs)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Fuel Entries</div>
+                                <div class="stat-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-list-check"></i></div>
+                            </div>
+                            <div class="stat-value">@TotalFuelEntries</div>
+                            <div class="stat-sub text-muted">@LowMileageCount flagged low mileage</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="mb-3">Recent Fuel Fills</h6>
+                    @if (!RecentFuelEntries.Any())
+                    {
+                        <div class="text-muted small">No fuel entries yet.</div>
+                    }
+                    else
+                    {
+                        @foreach (var f in RecentFuelEntries)
+                        {
+                            <div class="side-list-row">
+                                <div class="side-list-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-fuel-pump"></i></div>
+                                <div class="flex-grow-1 text-truncate">
+                                    <div class="font-monospace small">@f.FuelEntryCode</div>
+                                    <div class="text-muted" style="font-size:0.75rem;">@f.VehicleCode &mdash; @f.Litres.ToString("0.0") L</div>
+                                </div>
+                                <span class="badge bg-secondary">@f.Date.ToString("dd-MMM")</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-lg-8">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card stat-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
                                 <div class="stat-label">Total Trips</div>
                                 <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-calendar-check"></i></div>
                             </div>
@@ -477,6 +547,7 @@ else
     private List<TripListItemDto>? _trips;
     private List<WorkOrderListItemDto>? _workOrders;
     private List<CustomerListItemDto>? _customers;
+    private List<FuelEntryListItemDto>? _fuelEntries;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -490,6 +561,7 @@ else
             _trips = await Api.GetTripsAsync();
             _workOrders = await Api.GetWorkOrdersAsync();
             _customers = await Api.GetCustomersAsync();
+            _fuelEntries = await Api.GetFuelEntriesAsync();
         }
         catch (Exception ex)
         {
@@ -499,6 +571,7 @@ else
             _trips ??= new();
             _workOrders ??= new();
             _customers ??= new();
+            _fuelEntries ??= new();
         }
     }
 
@@ -553,6 +626,40 @@ else
     private List<CustomerListItemDto> RecentCustomers =>
         (_customers ?? new())
             .OrderByDescending(c => c.Id)
+            .Take(5)
+            .ToList();
+
+    private int TotalFuelEntries => _fuelEntries?.Count ?? 0;
+
+    private decimal FuelSpendThisMonth =>
+        (_fuelEntries ?? new()).Where(f => IsThisMonth(f.Date)).Sum(f => f.TotalCost);
+
+    private decimal FuelLitresThisMonth =>
+        (_fuelEntries ?? new()).Where(f => IsThisMonth(f.Date)).Sum(f => f.Litres);
+
+    private decimal? FleetAvgMileage
+    {
+        get
+        {
+            var vals = (_fuelEntries ?? new()).Where(f => f.Mileage.HasValue).Select(f => f.Mileage!.Value).ToList();
+            return vals.Count == 0 ? null : Math.Round(vals.Average(), 2);
+        }
+    }
+
+    private int LowMileageCount
+    {
+        get
+        {
+            var avg = FleetAvgMileage;
+            if (avg is null or 0) return 0;
+            return (_fuelEntries ?? new()).Count(f => f.Mileage.HasValue && f.Mileage.Value < avg.Value * 0.85m);
+        }
+    }
+
+    private List<FuelEntryListItemDto> RecentFuelEntries =>
+        (_fuelEntries ?? new())
+            .OrderByDescending(f => f.Date)
+            .ThenByDescending(f => f.Id)
             .Take(5)
             .ToList();
 

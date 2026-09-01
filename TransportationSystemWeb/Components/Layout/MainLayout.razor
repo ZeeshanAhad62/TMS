@@ -71,6 +71,15 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @(SubLinkClass("/fuel-entries") == "active" ? "active-module" : "")" title="Fuel Management">
+                    <i class="bi bi-fuel-pump"></i> <span class="nav-text">Fuel Management</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/fuel-entries")" href="/fuel-entries" title="Fuel Log">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Fuel Log</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/workorders") == "active" ? "active-module" : "")" title="Maintenance &amp; Workshop">
                     <i class="bi bi-tools"></i> <span class="nav-text">Maintenance &amp; Workshop</span>
                 </div>
