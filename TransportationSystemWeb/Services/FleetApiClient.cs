@@ -532,6 +532,29 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Compliance -----
+
+    public async Task<List<ComplianceItemDto>> GetComplianceExpiriesAsync(
+        ComplianceEntityType? entityType = null, ComplianceSeverity? severity = null, int withinDays = 60, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string> { $"withinDays={withinDays}" };
+        if (entityType.HasValue) query.Add($"entityType={entityType}");
+        if (severity.HasValue) query.Add($"severity={severity}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = "?" + string.Join("&", query);
+
+        return await _http.GetFromJsonAsync<List<ComplianceItemDto>>($"api/compliance/expiries{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<ComplianceSummaryDto?> GetComplianceSummaryAsync(int withinDays = 60)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/compliance/summary?withinDays={withinDays}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<ComplianceSummaryDto>(JsonOptions);
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

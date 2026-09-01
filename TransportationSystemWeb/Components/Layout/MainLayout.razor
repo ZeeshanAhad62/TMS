@@ -98,6 +98,15 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @(SubLinkClass("/compliance") == "active" ? "active-module" : "")" title="Compliance">
+                    <i class="bi bi-shield-check"></i> <span class="nav-text">Compliance</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/compliance")" href="/compliance" title="Expiry Tracker">
+                    <i class="bi bi-calendar-x"></i> <span class="nav-text">Expiry Tracker</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/reports") == "active" ? "active-module" : "")" title="Reports &amp; Analytics">
                     <i class="bi bi-bar-chart"></i> <span class="nav-text">Reports &amp; Analytics</span>
                 </div>

@@ -1,0 +1,174 @@
+@page "/compliance"
+@attribute [Authorize]
+@inject FleetApiClient Api
+
+<PageTitle>Compliance &amp; Document Expiry</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Compliance &amp; Document Expiry</h2>
+        <div class="text-muted small">Compliance &rsaquo; Expiry Tracker</div>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_summary is not null)
+{
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="card stat-card h-100"><div class="card-body">
+                <div class="stat-label">Expired</div>
+                <div class="stat-value text-danger">@_summary.Expired</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card stat-card h-100"><div class="card-body">
+                <div class="stat-label">Critical (&le; 7 days)</div>
+                <div class="stat-value text-danger">@_summary.Critical</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card stat-card h-100"><div class="card-body">
+                <div class="stat-label">Warning (&le; 30 days)</div>
+                <div class="stat-value text-warning-emphasis">@_summary.Warning</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card stat-card h-100"><div class="card-body">
+                <div class="stat-label">Upcoming</div>
+                <div class="stat-value">@_summary.Upcoming</div>
+            </div></div>
+        </div>
+    </div>
+}
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-3">
+            <input class="form-control" placeholder="Search code, name, document..."
+                   @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="_entityFilter">
+                <option value="">Vehicles &amp; drivers</option>
+                <option value="Vehicle">Vehicles only</option>
+                <option value="Driver">Drivers only</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="_severityFilter">
+                <option value="">All severities</option>
+                @foreach (var s in Enum.GetValues<ComplianceSeverity>())
+                {
+                    <option value="@s">@s.ToDisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" @bind="_withinDays">
+                <option value="30">Next 30 days</option>
+                <option value="60">Next 60 days</option>
+                <option value="90">Next 90 days</option>
+                <option value="180">Next 180 days</option>
+            </select>
+        </div>
+        <div class="col-md-1 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="Load"><i class="bi bi-funnel"></i></button>
+        </div>
+    </div>
+</div></div>
+
+@if (_items is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_items.Count == 0)
+{
+    <div class="alert alert-success">Nothing expiring in the selected window. All clear.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Type</th><th>Code</th><th>Name / Reg.</th><th>Document</th>
+                    <th>Expiry Date</th><th class="text-end">Days Left</th><th>Severity</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var i in _items)
+                {
+                    <tr>
+                        <td><i class="bi @(i.EntityType == ComplianceEntityType.Vehicle ? "bi-truck" : "bi-person-badge")"></i> @i.EntityType</td>
+                        <td class="font-monospace">@i.EntityCode</td>
+                        <td>@i.EntityName</td>
+                        <td>@i.DocumentType</td>
+                        <td>@i.ExpiryDate.ToString("dd-MMM-yyyy")</td>
+                        <td class="text-end">@(i.DaysRemaining < 0 ? $"{-i.DaysRemaining}d ago" : $"{i.DaysRemaining}d")</td>
+                        <td><span class="badge @SeverityBadge(i.Severity)">@i.Severity.ToDisplayName()</span></td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="@EditLink(i)">
+                                <i class="bi bi-pencil-square"></i> Open
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<ComplianceItemDto>? _items;
+    private ComplianceSummaryDto? _summary;
+    private string _search = "";
+    private string _entityFilter = "";
+    private string _severityFilter = "";
+    private string _withinDays = "60";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            var within = int.Parse(_withinDays);
+            ComplianceEntityType? entity = string.IsNullOrEmpty(_entityFilter) ? null : Enum.Parse<ComplianceEntityType>(_entityFilter);
+            ComplianceSeverity? severity = string.IsNullOrEmpty(_severityFilter) ? null : Enum.Parse<ComplianceSeverity>(_severityFilter);
+
+            _items = await Api.GetComplianceExpiriesAsync(entity, severity, within, _search);
+            _summary = await Api.GetComplianceSummaryAsync(within);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load compliance data: {ex.Message}";
+            _items = new();
+        }
+    }
+
+    private static string EditLink(ComplianceItemDto i) =>
+        i.EntityType == ComplianceEntityType.Vehicle
+            ? $"/fleet-vehicles/{i.EntityId}/edit"
+            : $"/drivers/{i.EntityId}/edit";
+
+    private static string SeverityBadge(ComplianceSeverity s) => s switch
+    {
+        ComplianceSeverity.Expired => "bg-danger",
+        ComplianceSeverity.Critical => "bg-danger",
+        ComplianceSeverity.Warning => "bg-warning text-dark",
+        ComplianceSeverity.Upcoming => "bg-secondary",
+        _ => "bg-secondary"
+    };
+}

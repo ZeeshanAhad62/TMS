@@ -30,9 +30,25 @@
 {
     <p><em>Loading...</em></p>
 }
-@* billing aging (_aging) loads separately and is allowed to be null *@
+@* billing aging (_aging) and compliance summary (_compliance) load separately and may be null *@
 else
 {
+    @if (_compliance is not null && (_compliance.Expired + _compliance.Critical + _compliance.Warning) > 0)
+    {
+        <a href="/compliance" class="text-decoration-none">
+            <div class="alert @(_compliance.Expired > 0 ? "alert-danger" : "alert-warning") d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="bi bi-shield-exclamation me-2"></i>
+                    <strong>@_compliance.Expired</strong> expired,
+                    <strong>@_compliance.Critical</strong> critical (&le;7d),
+                    <strong>@_compliance.Warning</strong> expiring within 30 days
+                    <span class="text-muted">— vehicles &amp; drivers</span>
+                </span>
+                <span class="btn btn-sm btn-outline-dark">Open Compliance <i class="bi bi-arrow-right"></i></span>
+            </div>
+        </a>
+    }
+
     <div class="row g-3">
         <div class="col-lg-8">
             <div class="row g-3">
@@ -613,6 +629,7 @@ else
     private List<CustomerListItemDto>? _customers;
     private List<FuelEntryListItemDto>? _fuelEntries;
     private InvoiceAgingDto? _aging;
+    private ComplianceSummaryDto? _compliance;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -628,6 +645,7 @@ else
             _customers = await Api.GetCustomersAsync();
             _fuelEntries = await Api.GetFuelEntriesAsync();
             _aging = await Api.GetInvoiceAgingAsync();
+            _compliance = await Api.GetComplianceSummaryAsync(30);
         }
         catch (Exception ex)
         {
