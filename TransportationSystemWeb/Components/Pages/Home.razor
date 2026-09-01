@@ -16,6 +16,7 @@
         <a class="btn btn-outline-primary btn-sm" href="/customers"><i class="bi bi-people me-1"></i>Customer Master</a>
         <a class="btn btn-outline-primary btn-sm" href="/trips"><i class="bi bi-calendar-check me-1"></i>Trip List</a>
         <a class="btn btn-outline-primary btn-sm" href="/fuel-entries"><i class="bi bi-fuel-pump me-1"></i>Fuel Log</a>
+        <a class="btn btn-outline-primary btn-sm" href="/invoices"><i class="bi bi-receipt me-1"></i>Invoices</a>
         <a class="btn btn-outline-primary btn-sm" href="/workorders"><i class="bi bi-tools me-1"></i>Work Orders</a>
     </div>
 </div>
@@ -29,6 +30,7 @@
 {
     <p><em>Loading...</em></p>
 }
+@* billing aging (_aging) loads separately and is allowed to be null *@
 else
 {
     <div class="row g-3">
@@ -402,6 +404,68 @@ else
         </div>
     </div>
 
+    @if (_aging is not null)
+    {
+        <div class="row g-3 mt-1">
+            <div class="col-lg-8">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Outstanding (A/R)</div>
+                                    <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-receipt"></i></div>
+                                </div>
+                                <div class="stat-value">@_aging.TotalOutstanding.ToString("N0")</div>
+                                <div class="stat-sub text-muted">Across all open invoices</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Overdue</div>
+                                    <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-exclamation-octagon"></i></div>
+                                </div>
+                                <div class="stat-value text-danger">@_aging.OverdueAmount.ToString("N0")</div>
+                                <div class="stat-sub text-muted">Past due date, unpaid</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Collected This Month</div>
+                                    <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-cash-coin"></i></div>
+                                </div>
+                                <div class="stat-value">@_aging.CollectedThisMonth.ToString("N0")</div>
+                                <div class="stat-sub text-muted">Payments received</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h6 class="mb-3">Receivables Aging</h6>
+                        @foreach (var b in _aging.Buckets)
+                        {
+                            <div class="side-list-row">
+                                <div class="side-list-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-hourglass-split"></i></div>
+                                <div class="flex-grow-1 text-truncate">@b.Label</div>
+                                <span class="badge bg-light text-dark border">@b.Amount.ToString("N0")</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
     <div class="row g-3 mt-1">
         <div class="col-lg-8">
             <div class="row g-3">
@@ -548,6 +612,7 @@ else
     private List<WorkOrderListItemDto>? _workOrders;
     private List<CustomerListItemDto>? _customers;
     private List<FuelEntryListItemDto>? _fuelEntries;
+    private InvoiceAgingDto? _aging;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -562,6 +627,7 @@ else
             _workOrders = await Api.GetWorkOrdersAsync();
             _customers = await Api.GetCustomersAsync();
             _fuelEntries = await Api.GetFuelEntriesAsync();
+            _aging = await Api.GetInvoiceAgingAsync();
         }
         catch (Exception ex)
         {

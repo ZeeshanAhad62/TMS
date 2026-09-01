@@ -1,0 +1,203 @@
+@page "/invoices"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Billing &amp; Invoicing</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Billing &amp; Invoicing</h2>
+        <div class="text-muted small">Billing &amp; Invoicing &rsaquo; Invoices</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary" href="/invoices/from-trips"><i class="bi bi-truck me-1"></i>New from Trips</a>
+        <a class="btn btn-primary" href="/invoices/new"><i class="bi bi-plus-lg me-1"></i>Add Invoice</a>
+    </div>
+</div>
+
+@if (_aging is not null)
+{
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <div class="card stat-card"><div class="card-body">
+                <div class="stat-label">Total Outstanding</div>
+                <div class="stat-value">@_aging.TotalOutstanding.ToString("N0")</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card"><div class="card-body">
+                <div class="stat-label">Overdue</div>
+                <div class="stat-value text-danger">@_aging.OverdueAmount.ToString("N0")</div>
+            </div></div>
+        </div>
+        @foreach (var b in _aging.Buckets.Where(b => b.Label != "Current"))
+        {
+            <div class="col-md-3 col-lg">
+                <div class="card stat-card h-100"><div class="card-body">
+                    <div class="stat-label">@b.Label</div>
+                    <div class="fs-5">@b.Amount.ToString("N0")</div>
+                    <div class="stat-sub text-muted">@b.Count invoice(s)</div>
+                </div></div>
+            </div>
+        }
+    </div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <input class="form-control" placeholder="Search invoice # or customer..."
+                       @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_customerFilter">
+                    <option value="">All customers</option>
+                    @foreach (var c in _customers)
+                    {
+                        <option value="@c.Id">@c.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" @bind="_statusFilter">
+                    <option value="">All statuses</option>
+                    @foreach (var s in Enum.GetValues<InvoiceStatus>())
+                    {
+                        <option value="@s">@s.ToDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-center">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="overdueOnly" @bind="_overdueOnly" />
+                    <label class="form-check-label" for="overdueOnly">Overdue only</label>
+                </div>
+            </div>
+            <div class="col-md-1 d-grid">
+                <button class="btn btn-outline-secondary" @onclick="Load"><i class="bi bi-funnel"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_invoices is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_invoices.Count == 0)
+{
+    <div class="alert alert-info">No invoices found.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Invoice #</th><th>Customer</th><th>Date</th><th>Due</th>
+                    <th class="text-end">Total</th><th class="text-end">Paid</th><th class="text-end">Balance</th>
+                    <th>Status</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var i in _invoices)
+                {
+                    <tr>
+                        <td class="font-monospace">@i.InvoiceNumber</td>
+                        <td>@i.CustomerName</td>
+                        <td>@i.InvoiceDate.ToString("dd-MMM-yyyy")</td>
+                        <td class="@(i.IsOverdue ? "text-danger fw-semibold" : "")">@i.DueDate.ToString("dd-MMM-yyyy")</td>
+                        <td class="text-end">@i.Total.ToString("N2")</td>
+                        <td class="text-end">@i.AmountPaid.ToString("N2")</td>
+                        <td class="text-end">@i.Balance.ToString("N2")</td>
+                        <td>
+                            <span class="badge @StatusBadgeClass(i.Status)">@i.Status.ToDisplayName()</span>
+                            @if (i.IsOverdue)
+                            {
+                                <span class="badge bg-danger ms-1">Overdue</span>
+                            }
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-primary" href="/invoices/@i.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(i.Id)" title="Delete invoice">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<InvoiceListItemDto>? _invoices;
+    private List<CustomerListItemDto> _customers = new();
+    private InvoiceAgingDto? _aging;
+    private string _search = "";
+    private string _customerFilter = "";
+    private string _statusFilter = "";
+    private bool _overdueOnly;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _customers = await Api.GetCustomersAsync();
+        await Load();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            int? customerId = string.IsNullOrEmpty(_customerFilter) ? null : int.Parse(_customerFilter);
+            InvoiceStatus? status = string.IsNullOrEmpty(_statusFilter) ? null : Enum.Parse<InvoiceStatus>(_statusFilter);
+            _invoices = await Api.GetInvoicesAsync(customerId, status, _overdueOnly ? true : null, _search);
+            _aging = await Api.GetInvoiceAgingAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load invoices: {ex.Message}";
+            _invoices = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Delete this invoice and all its lines and payments?");
+        if (!confirmed) return;
+        try
+        {
+            await Api.DeleteInvoiceAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete invoice: {ex.Message}";
+        }
+    }
+
+    private static string StatusBadgeClass(InvoiceStatus status) => status switch
+    {
+        InvoiceStatus.Draft => "bg-secondary",
+        InvoiceStatus.Sent => "bg-primary",
+        InvoiceStatus.PartiallyPaid => "bg-warning text-dark",
+        InvoiceStatus.Paid => "bg-success",
+        InvoiceStatus.Cancelled => "bg-dark",
+        _ => "bg-secondary"
+    };
+}

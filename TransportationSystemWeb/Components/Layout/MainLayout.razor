@@ -89,6 +89,15 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @(SubLinkClass("/invoices") == "active" ? "active-module" : "")" title="Billing &amp; Invoicing">
+                    <i class="bi bi-receipt"></i> <span class="nav-text">Billing &amp; Invoicing</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/invoices")" href="/invoices" title="Invoices">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Invoices</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/reports") == "active" ? "active-module" : "")" title="Reports &amp; Analytics">
                     <i class="bi bi-bar-chart"></i> <span class="nav-text">Reports &amp; Analytics</span>
                 </div>

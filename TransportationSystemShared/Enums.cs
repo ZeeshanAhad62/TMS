@@ -169,3 +169,20 @@ public enum ExpensePaidBy
     Company,
     Driver
 }
+
+public enum InvoiceStatus
+{
+    Draft,
+    Sent,
+    PartiallyPaid,
+    Paid,
+    Cancelled
+}
+
+public enum PaymentMode
+{
+    Cash,
+    Bank,
+    Cheque,
+    Online
+}

@@ -328,6 +328,117 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Invoices (Billing & A/R) -----
+
+    public async Task<List<InvoiceListItemDto>> GetInvoicesAsync(int? customerId = null, InvoiceStatus? status = null, bool? overdue = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (customerId.HasValue) query.Add($"customerId={customerId}");
+        if (status.HasValue) query.Add($"status={status}");
+        if (overdue == true) query.Add("overdue=true");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+
+        return await _http.GetFromJsonAsync<List<InvoiceListItemDto>>($"api/invoices{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<InvoiceDetailDto?> GetInvoiceAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/invoices/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<InvoiceDetailDto>(JsonOptions);
+    }
+
+    public async Task<InvoiceDetailDto> CreateInvoiceAsync(InvoiceUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/invoices", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<InvoiceDetailDto>(JsonOptions))!;
+    }
+
+    public async Task<InvoiceDetailDto> CreateInvoiceFromTripsAsync(CreateInvoiceFromTripsDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/invoices/from-trips", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<InvoiceDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateInvoiceAsync(int id, InvoiceUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/invoices/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteInvoiceAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/invoices/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<List<BillableTripDto>> GetBillableTripsAsync(int customerId)
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<List<BillableTripDto>>($"api/invoices/billable-trips?customerId={customerId}", JsonOptions) ?? new();
+    }
+
+    public async Task<InvoiceAgingDto?> GetInvoiceAgingAsync()
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync("api/invoices/aging");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<InvoiceAgingDto>(JsonOptions);
+    }
+
+    public async Task<InvoiceLineDto> CreateInvoiceLineAsync(int invoiceId, InvoiceLineUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/invoices/{invoiceId}/lines", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<InvoiceLineDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateInvoiceLineAsync(int invoiceId, int lineId, InvoiceLineUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/invoices/{invoiceId}/lines/{lineId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteInvoiceLineAsync(int invoiceId, int lineId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/invoices/{invoiceId}/lines/{lineId}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<PaymentDto> CreatePaymentAsync(int invoiceId, PaymentUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/invoices/{invoiceId}/payments", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<PaymentDto>(JsonOptions))!;
+    }
+
+    public async Task UpdatePaymentAsync(int invoiceId, int paymentId, PaymentUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/invoices/{invoiceId}/payments/{paymentId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeletePaymentAsync(int invoiceId, int paymentId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/invoices/{invoiceId}/payments/{paymentId}");
+        await EnsureSuccess(response);
+    }
+
     // ----- Customers -----
 
     public async Task<List<CustomerListItemDto>> GetCustomersAsync(CustomerStatus? status = null, string? search = null)

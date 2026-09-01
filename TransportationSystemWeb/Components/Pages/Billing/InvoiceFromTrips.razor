@@ -1,0 +1,181 @@
+@page "/invoices/from-trips"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>New Invoice from Trips - Billing</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">New Invoice from Trips</h2>
+        <div class="text-muted small">Billing &amp; Invoicing &rsaquo; Invoices</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="/invoices"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">Customer *</label>
+            <select class="form-select" @bind="_customerId" @bind:after="LoadBillableTrips">
+                <option value="0">Select a customer...</option>
+                @foreach (var c in _customers)
+                {
+                    <option value="@c.Id">@c.CustomerCode &mdash; @c.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Invoice Date *</label>
+            <input type="date" class="form-control" @bind="_invoiceDate" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Due Date *</label>
+            <input type="date" class="form-control" @bind="_dueDate" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Tax %</label>
+            <input type="number" step="0.01" class="form-control" @bind="_taxPercent" />
+        </div>
+    </div>
+</div></div>
+
+@if (_loadingTrips)
+{
+    <p><em>Loading billable trips...</em></p>
+}
+else if (_customerId > 0)
+{
+    <div class="card"><div class="card-body">
+        <h5 class="card-title">Unbilled Trips for this Customer</h5>
+        @if (_trips.Count == 0)
+        {
+            <div class="alert alert-info mb-0">No unbilled trips found for this customer.</div>
+        }
+        else
+        {
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th style="width:2rem;">
+                            <input type="checkbox" class="form-check-input" @onchange="ToggleAll" checked="@AllSelected" />
+                        </th>
+                        <th>Trip</th><th>Route</th><th>Start</th><th>Status</th><th class="text-end">Revenue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var t in _trips)
+                {
+                    <tr>
+                        <td><input type="checkbox" class="form-check-input" checked="@_selected.Contains(t.TripId)" @onchange="e => Toggle(t.TripId, e)" /></td>
+                        <td class="font-monospace">@t.TripCode</td>
+                        <td>@t.Origin &rarr; @t.Destination</td>
+                        <td>@t.StartDate.ToString("dd-MMM-yyyy")</td>
+                        <td>@t.Status.ToDisplayName()</td>
+                        <td class="text-end">@t.Revenue.ToString("N2")</td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="5" class="text-end">Selected (@_selected.Count) sub-total</th>
+                        <th class="text-end">@SelectedTotal.ToString("N2")</th>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <button class="btn btn-primary" @onclick="Create" disabled="@(_selected.Count == 0 || _creating)">
+                <i class="bi bi-receipt me-1"></i>Create Invoice with @_selected.Count line(s)
+            </button>
+        }
+    </div></div>
+}
+
+@code {
+    private List<CustomerListItemDto> _customers = new();
+    private List<BillableTripDto> _trips = new();
+    private readonly HashSet<int> _selected = new();
+
+    private int _customerId;
+    private DateTime _invoiceDate = DateTime.Today;
+    private DateTime _dueDate = DateTime.Today.AddDays(30);
+    private decimal _taxPercent;
+
+    private bool _loadingTrips;
+    private bool _creating;
+    private string? _error;
+
+    private bool AllSelected => _trips.Count > 0 && _selected.Count == _trips.Count;
+    private decimal SelectedTotal => _trips.Where(t => _selected.Contains(t.TripId)).Sum(t => t.Revenue);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _customers = await Api.GetCustomersAsync();
+    }
+
+    private async Task LoadBillableTrips()
+    {
+        _error = null;
+        _selected.Clear();
+        _trips = new();
+        if (_customerId <= 0) return;
+
+        _loadingTrips = true;
+        try
+        {
+            _trips = await Api.GetBillableTripsAsync(_customerId);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load trips: {ex.Message}";
+        }
+        finally
+        {
+            _loadingTrips = false;
+        }
+    }
+
+    private void Toggle(int tripId, ChangeEventArgs e)
+    {
+        if (e.Value is true) _selected.Add(tripId);
+        else _selected.Remove(tripId);
+    }
+
+    private void ToggleAll(ChangeEventArgs e)
+    {
+        _selected.Clear();
+        if (e.Value is true)
+        {
+            foreach (var t in _trips) _selected.Add(t.TripId);
+        }
+    }
+
+    private async Task Create()
+    {
+        _error = null;
+        _creating = true;
+        try
+        {
+            var dto = new CreateInvoiceFromTripsDto
+            {
+                CustomerId = _customerId,
+                TripIds = _selected.ToList(),
+                InvoiceDate = DateOnly.FromDateTime(_invoiceDate),
+                DueDate = DateOnly.FromDateTime(_dueDate),
+                TaxPercent = _taxPercent
+            };
+            var created = await Api.CreateInvoiceFromTripsAsync(dto);
+            Nav.NavigateTo($"/invoices/{created.Id}/edit");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to create invoice: {ex.Message}";
+            _creating = false;
+        }
+    }
+}

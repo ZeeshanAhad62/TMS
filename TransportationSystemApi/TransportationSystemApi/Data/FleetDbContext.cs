@@ -27,6 +27,9 @@ public class FleetDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<FuelEntry> FuelEntries => Set<FuelEntry>();
     public DbSet<TripExpense> TripExpenses => Set<TripExpense>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
+    public DbSet<Payment> Payments => Set<Payment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -157,6 +160,40 @@ public class FleetDbContext : DbContext
         modelBuilder.Entity<TripExpense>(entity =>
         {
             entity.Property(e => e.Amount).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<Invoice>(entity =>
+        {
+            entity.HasIndex(i => i.InvoiceNumber).IsUnique();
+            entity.Property(i => i.TaxPercent).HasPrecision(9, 4);
+
+            entity.HasOne(i => i.Customer)
+                .WithMany()
+                .HasForeignKey(i => i.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(i => i.Lines)
+                .WithOne(l => l.Invoice)
+                .HasForeignKey(l => l.InvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(i => i.Payments)
+                .WithOne(p => p.Invoice)
+                .HasForeignKey(p => p.InvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InvoiceLine>(entity =>
+        {
+            entity.Property(l => l.Quantity).HasPrecision(18, 2);
+            entity.Property(l => l.UnitPrice).HasPrecision(18, 2);
+            entity.HasIndex(l => l.TripId);
+            // TripId is a soft link only -- no relationship / FK configured.
+        });
+
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.Property(p => p.Amount).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<WorkOrder>(entity =>
