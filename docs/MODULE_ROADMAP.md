@@ -237,4 +237,4 @@ Rationale: turn the app from record-keeping into an operations-and-money system.
 | Date | Module | Commit | Notes |
 |---|---|---|---|
 | 2026-09-01 | Roadmap created | — | This document. |
-| 2026-09-01 | Customer Master (CRUD) | _pending_ | `dbo.Customers` (migration 006, applied to dev DB). `Customer` model + `CustomerStatus` enum, `CustomerDtos`, `CustomerMapper`, `CustomersController` (`api/customers`), `FleetApiClient` methods, `Customers/CustomerList.razor` + `CustomerEditor.razor` (single card), sidebar nav, Home dashboard section. Full CRUD + search + validation verified via API. Trip `CustomerId` link still to do. |
+| 2026-09-01 | Customer Master (CRUD) | `e757dc8` | `dbo.Customers` (migration 006, applied to dev DB). `Customer` model + `CustomerStatus` enum, `CustomerDtos`, `CustomerMapper`, `CustomersController` (`api/customers`), `FleetApiClient` methods, `Customers/CustomerList.razor` + `CustomerEditor.razor` (single card), sidebar nav, Home dashboard section. Full CRUD + search + validation verified via API. Trip `CustomerId` link still to do. |
