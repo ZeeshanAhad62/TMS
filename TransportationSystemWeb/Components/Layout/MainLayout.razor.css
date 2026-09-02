@@ -283,6 +283,21 @@ a.nav-module-header:hover {
 }
 
 @media (min-width: 992px) {
+    /* Pin the sidebar to the viewport so it never scrolls with the page.
+       Only the dashboard content on the right scrolls; if the menu is taller
+       than the screen, .sidebar-nav scrolls on its own. */
+    .app-shell {
+        /* dark fill behind the pinned sidebar on a long page */
+        background: #171c25;
+    }
+
+    .app-sidebar {
+        position: sticky;
+        top: 0;
+        align-self: flex-start;
+        height: 100vh;
+    }
+
     .sidebar-close {
         display: none;
     }
