@@ -1,0 +1,172 @@
+@page "/tyres"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Tyre Management</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Tyre Management</h2>
+        <div class="text-muted small">Tyre Management &rsaquo; Tyre List</div>
+    </div>
+    <a class="btn btn-primary" href="/tyres/new">
+        <i class="bi bi-plus-lg me-1"></i>Add Tyre
+    </a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">In Stock</div>
+            <div class="stat-value">@(_tyres?.Count(t => t.Status == TyreStatus.InStock) ?? 0)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Fitted</div>
+            <div class="stat-value text-success">@(_tyres?.Count(t => t.Status == TyreStatus.Fitted) ?? 0)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Scrapped</div>
+            <div class="stat-value text-muted">@(_tyres?.Count(t => t.Status == TyreStatus.Scrapped) ?? 0)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Worst Cost/km</div>
+            <div class="stat-value text-danger">@(WorstCostPerKm() is decimal c ? c.ToString("N2") : "—")</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-5">
+            <input class="form-control" placeholder="Search serial, brand, vehicle reg..."
+                   @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+        </div>
+        <div class="col-md-4">
+            <select class="form-select" @bind="_statusFilter">
+                <option value="">All statuses</option>
+                @foreach (var s in Enum.GetValues<TyreStatus>())
+                {
+                    <option value="@s">@s.ToDisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="Load">
+                <i class="bi bi-funnel me-1"></i>Apply
+            </button>
+        </div>
+    </div>
+</div></div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_tyres is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_tyres.Count == 0)
+{
+    <div class="alert alert-info">No tyres found. Click "Add Tyre" to register the first one.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Serial</th><th>Brand / Size</th><th>Pattern</th><th>Status</th>
+                    <th>Vehicle</th><th>Position</th><th class="text-end">Distance Run</th>
+                    <th class="text-end">Cost/km</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in _tyres)
+                {
+                    <tr>
+                        <td class="font-monospace">@(string.IsNullOrWhiteSpace(t.SerialNumber) ? "—" : t.SerialNumber)</td>
+                        <td>@(string.IsNullOrWhiteSpace(t.BrandAndSize) ? "—" : t.BrandAndSize)</td>
+                        <td>@(string.IsNullOrWhiteSpace(t.Pattern) ? "—" : t.Pattern)</td>
+                        <td><span class="badge @StatusBadge(t.Status)">@t.Status.ToDisplayName()</span></td>
+                        <td>@(t.VehicleId.HasValue ? t.VehicleRegistrationNumber : "In stock")</td>
+                        <td>@(t.VehicleId.HasValue ? t.Position.ToDisplayName() : "—")</td>
+                        <td class="text-end">@t.DistanceRun.ToString("N0") km</td>
+                        <td class="text-end">@(t.CostPerKm?.ToString("N2") ?? "—")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/tyres/@t.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(t.Id)" title="Delete tyre">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<TyreListItemDto>? _tyres;
+    private string _search = "";
+    private string _statusFilter = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            TyreStatus? status = string.IsNullOrEmpty(_statusFilter) ? null : Enum.Parse<TyreStatus>(_statusFilter);
+            _tyres = await Api.GetTyresAsync(status, null, _search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load tyres: {ex.Message}";
+            _tyres = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Delete this tyre and its full event history? This cannot be undone.");
+        if (!confirmed) return;
+
+        try
+        {
+            await Api.DeleteTyreRecordAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete tyre: {ex.Message}";
+        }
+    }
+
+    private decimal? WorstCostPerKm() =>
+        _tyres?.Where(t => t.CostPerKm.HasValue).OrderByDescending(t => t.CostPerKm).Select(t => t.CostPerKm).FirstOrDefault();
+
+    private static string StatusBadge(TyreStatus s) => s switch
+    {
+        TyreStatus.InStock => "bg-secondary",
+        TyreStatus.Fitted => "bg-success",
+        TyreStatus.Scrapped => "bg-dark",
+        _ => "bg-secondary"
+    };
+}

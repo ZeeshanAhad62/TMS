@@ -40,11 +40,26 @@ public class VehicleTyresController : ControllerBase
             InstallationDate = dto.InstallationDate,
             InstallationOdometer = dto.InstallationOdometer,
             CurrentCondition = dto.CurrentCondition,
-            LastRotationDate = dto.LastRotationDate
+            LastRotationDate = dto.LastRotationDate,
+            Status = TyreStatus.Fitted
         };
 
         _db.Tyres.Add(tyre);
         await _db.SaveChangesAsync();
+
+        // Keep the full asset module's event log seeded even for tyres added
+        // via this quick-add tab, so its lifecycle history isn't empty.
+        _db.TyreEvents.Add(new TyreEvent
+        {
+            TyreId = tyre.Id,
+            EventType = TyreEventType.Fit,
+            EventDate = dto.InstallationDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
+            VehicleId = vehicleId,
+            Position = dto.Position,
+            Odometer = dto.InstallationOdometer
+        });
+        await _db.SaveChangesAsync();
+
         return Ok(VehicleMapper.ToDto(tyre));
     }
 

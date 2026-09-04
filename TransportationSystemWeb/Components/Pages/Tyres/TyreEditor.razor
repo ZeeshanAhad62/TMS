@@ -1,0 +1,359 @@
+@page "/tyres/new"
+@page "/tyres/{Id:int}/edit"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "Add Tyre" : "Edit Tyre") - Tyre Management</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">
+            @if (IsNew)
+            {
+                <text>Add Tyre</text>
+            }
+            else
+            {
+                <span class="font-monospace">@(_detail?.SerialNumber ?? $"Tyre #{_detail?.Id}")</span>
+                @if (_detail is not null)
+                {
+                    <span class="badge ms-2 @StatusBadge(_detail.Status)">@_detail.Status.ToDisplayName()</span>
+                }
+            }
+        </h2>
+        <div class="text-muted small">Tyre Management &rsaquo; Tyre List</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="/tyres"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+@if (_message is not null)
+{
+    <div class="alert alert-success">@_message</div>
+}
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    @if (!IsNew && _detail is not null)
+    {
+        <ul class="nav nav-tabs mb-3">
+            @foreach (var tab in Tabs)
+            {
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(_activeTab == tab ? "active" : "")" @onclick="() => _activeTab = tab">@tab</button>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (_activeTab == "Details")
+    {
+        <EditForm Model="_model" OnValidSubmit="Save">
+            <DataAnnotationsValidator />
+
+            @if (!IsNew && _detail is not null)
+            {
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="stat-label">Vehicle</div>
+                            <div class="fw-semibold">@(_detail.VehicleId.HasValue ? _detail.VehicleRegistrationNumber : "In stock")</div>
+                        </div></div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="stat-label">Position</div>
+                            <div class="fw-semibold">@(_detail.VehicleId.HasValue ? _detail.Position.ToDisplayName() : "—")</div>
+                        </div></div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="stat-label">Distance Run</div>
+                            <div class="fw-semibold">@_detail.DistanceRun.ToString("N0") km</div>
+                        </div></div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="stat-label">Cost / km</div>
+                            <div class="fw-semibold">@(_detail.CostPerKm?.ToString("N2") ?? "—")</div>
+                        </div></div>
+                    </div>
+                </div>
+            }
+
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Tyre Details</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Serial Number</label>
+                        <InputText class="form-control" @bind-Value="_model.SerialNumber" />
+                        <ValidationMessage For="() => _model.SerialNumber" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Brand / Size</label>
+                        <InputText class="form-control" @bind-Value="_model.BrandAndSize" placeholder="e.g. Bridgestone 295/80R22.5" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Tread Pattern</label>
+                        <InputText class="form-control" @bind-Value="_model.Pattern" />
+                        <ValidationMessage For="() => _model.Pattern" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Purchase Date</label>
+                        <InputDate class="form-control" @bind-Value="_model.PurchaseDate" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Purchase Cost</label>
+                        <InputNumber class="form-control" @bind-Value="_model.PurchaseCost" />
+                        <ValidationMessage For="() => _model.PurchaseCost" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Condition</label>
+                        <InputText class="form-control" @bind-Value="_model.CurrentCondition" placeholder="tread depth / rating" />
+                    </div>
+                </div>
+            </div></div>
+
+            <div class="mt-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@(IsNew ? "Create Tyre" : "Save Changes")</button>
+                <a class="btn btn-outline-secondary" href="/tyres">Cancel</a>
+            </div>
+        </EditForm>
+    }
+    else if (_activeTab == "Events" && _detail is not null)
+    {
+        <div class="card"><div class="card-body">
+            <h5 class="card-title">Log an Event</h5>
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-2">
+                    <label class="form-label">Event</label>
+                    <select class="form-select" @bind="_newEvent.EventType">
+                        @foreach (var t in Enum.GetValues<TyreEventType>())
+                        {
+                            <option value="@t">@t.ToDisplayName()</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Date</label>
+                    <input type="date" class="form-control" @bind="_newEvent.EventDate" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Vehicle @(_newEvent.EventType == TyreEventType.Fit ? "*" : "")</label>
+                    <select class="form-select" @bind="_newEventVehicleId">
+                        <option value="">—</option>
+                        @foreach (var v in _vehicles)
+                        {
+                            <option value="@v.Id">@v.RegistrationNumber</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Position</label>
+                    <select class="form-select" @bind="_newEventPosition">
+                        <option value="">—</option>
+                        @foreach (var p in Enum.GetValues<TyrePosition>())
+                        {
+                            <option value="@p">@p.ToDisplayName()</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Odometer</label>
+                    <input type="number" step="0.01" class="form-control" @bind="_newEvent.Odometer" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Cost</label>
+                    <input type="number" step="0.01" class="form-control" @bind="_newEvent.Cost" />
+                </div>
+                <div class="col-md-11">
+                    <label class="form-label">Notes</label>
+                    <input class="form-control" @bind="_newEvent.Notes" />
+                </div>
+                <div class="col-md-1 d-grid">
+                    <button type="button" class="btn btn-primary" @onclick="AddEvent"><i class="bi bi-plus-lg"></i></button>
+                </div>
+            </div>
+
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Date</th><th>Event</th><th>Vehicle</th><th>Position</th><th class="text-end">Odometer</th><th class="text-end">Cost</th><th>Notes</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var e in _detail.Events)
+                {
+                    <tr>
+                        <td>@e.EventDate.ToString("dd-MMM-yyyy")</td>
+                        <td>@e.EventType.ToDisplayName()</td>
+                        <td>@(e.VehicleId.HasValue ? VehicleReg(e.VehicleId.Value) : "—")</td>
+                        <td>@(e.Position?.ToDisplayName() ?? "—")</td>
+                        <td class="text-end">@(e.Odometer?.ToString("N0") ?? "—")</td>
+                        <td class="text-end">@(e.Cost?.ToString("N2") ?? "—")</td>
+                        <td>@(string.IsNullOrWhiteSpace(e.Notes) ? "—" : e.Notes)</td>
+                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteEvent(e.Id)"><i class="bi bi-trash"></i></button></td>
+                    </tr>
+                }
+                @if (_detail.Events.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-muted small">No events logged yet.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div></div>
+    }
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool IsNew => Id is null;
+    private static readonly string[] Tabs = { "Details", "Events" };
+    private string _activeTab = "Details";
+
+    private bool _loading = true;
+    private string? _error;
+    private string? _message;
+
+    private TyreCreateDto _model = new();
+    private TyreDetailDto? _detail;
+    private List<VehicleListItemDto> _vehicles = new();
+
+    private TyreEventUpsertDto _newEvent = NewEvent();
+    private string _newEventVehicleId = "";
+    private string _newEventPosition = "";
+
+    private static TyreEventUpsertDto NewEvent() => new() { EventDate = DateOnly.FromDateTime(DateTime.Today) };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _activeTab = "Details";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _vehicles = await Api.GetVehiclesAsync();
+
+            if (Id.HasValue)
+            {
+                _detail = await Api.GetTyreAsync(Id.Value);
+                if (_detail is null)
+                {
+                    _error = "Tyre not found.";
+                }
+                else
+                {
+                    _model = new TyreCreateDto
+                    {
+                        SerialNumber = _detail.SerialNumber,
+                        BrandAndSize = _detail.BrandAndSize,
+                        Pattern = _detail.Pattern,
+                        PurchaseDate = _detail.PurchaseDate,
+                        PurchaseCost = _detail.PurchaseCost,
+                        CurrentCondition = _detail.CurrentCondition
+                    };
+                }
+            }
+            else
+            {
+                _detail = null;
+                _model = new TyreCreateDto();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load tyre: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        _error = null;
+        _message = null;
+
+        try
+        {
+            if (IsNew)
+            {
+                var created = await Api.CreateTyreRecordAsync(_model);
+                Nav.NavigateTo($"/tyres/{created.Id}/edit");
+            }
+            else
+            {
+                await Api.UpdateTyreRecordAsync(Id!.Value, _model);
+                _message = "Changes saved.";
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save tyre: {ex.Message}";
+        }
+    }
+
+    private async Task AddEvent()
+    {
+        _error = null;
+        if (Id is null) return;
+
+        try
+        {
+            _newEvent.VehicleId = string.IsNullOrEmpty(_newEventVehicleId) ? null : int.Parse(_newEventVehicleId);
+            _newEvent.Position = string.IsNullOrEmpty(_newEventPosition) ? null : Enum.Parse<TyrePosition>(_newEventPosition);
+
+            await Api.AddTyreEventAsync(Id.Value, _newEvent);
+
+            _newEvent = NewEvent();
+            _newEventVehicleId = "";
+            _newEventPosition = "";
+
+            _detail = await Api.GetTyreAsync(Id.Value);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to log event: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteEvent(int eventId)
+    {
+        _error = null;
+        if (Id is null) return;
+
+        try
+        {
+            await Api.DeleteTyreEventAsync(Id.Value, eventId);
+            _detail = await Api.GetTyreAsync(Id.Value);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete event: {ex.Message}";
+        }
+    }
+
+    private string VehicleReg(int vehicleId) =>
+        _vehicles.FirstOrDefault(v => v.Id == vehicleId)?.RegistrationNumber ?? $"#{vehicleId}";
+
+    private static string StatusBadge(TyreStatus s) => s switch
+    {
+        TyreStatus.InStock => "bg-secondary",
+        TyreStatus.Fitted => "bg-success",
+        TyreStatus.Scrapped => "bg-dark",
+        _ => "bg-secondary"
+    };
+}

@@ -18,6 +18,7 @@
         <a class="btn btn-outline-primary btn-sm" href="/fuel-entries"><i class="bi bi-fuel-pump me-1"></i>Fuel Log</a>
         <a class="btn btn-outline-primary btn-sm" href="/invoices"><i class="bi bi-receipt me-1"></i>Invoices</a>
         <a class="btn btn-outline-primary btn-sm" href="/workorders"><i class="bi bi-tools me-1"></i>Work Orders</a>
+        <a class="btn btn-outline-primary btn-sm" href="/tyres"><i class="bi bi-circle me-1"></i>Tyres</a>
     </div>
 </div>
 
@@ -619,6 +620,78 @@ else
             </div>
         </div>
     </div>
+
+    @if (_tyres is not null)
+    {
+        <div class="row g-3 mt-1">
+            <div class="col-lg-8">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Tyres In Stock</div>
+                                    <div class="stat-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-circle"></i></div>
+                                </div>
+                                <div class="stat-value">@TyresInStockCount</div>
+                                <div class="stat-sub text-muted">Available to fit</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Tyres Fitted</div>
+                                    <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-circle-fill"></i></div>
+                                </div>
+                                <div class="stat-value">@TyresFittedCount</div>
+                                <div class="stat-sub text-muted">Across the fleet</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Worst Cost / km</div>
+                                    <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-graph-up-arrow"></i></div>
+                                </div>
+                                <div class="stat-value">@(WorstTyreCostPerKm?.ToString("N2") ?? "—")</div>
+                                <div class="stat-sub text-muted">Highest lifetime cost/km</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h6 class="mb-3">Tyres to Watch</h6>
+                        @if (!WorstTyres.Any())
+                        {
+                            <div class="text-muted small">Not enough data yet.</div>
+                        }
+                        else
+                        {
+                            @foreach (var t in WorstTyres)
+                            {
+                                <div class="side-list-row">
+                                    <div class="side-list-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-circle"></i></div>
+                                    <div class="flex-grow-1 text-truncate">
+                                        <div class="font-monospace small">@(t.SerialNumber ?? $"Tyre #{t.Id}")</div>
+                                        <div class="text-muted" style="font-size:0.75rem;">@(t.VehicleRegistrationNumber ?? "In stock") &mdash; @t.DistanceRun.ToString("N0") km</div>
+                                    </div>
+                                    <span class="badge bg-light text-dark border">@t.CostPerKm!.Value.ToString("N2")</span>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -630,6 +703,7 @@ else
     private List<FuelEntryListItemDto>? _fuelEntries;
     private InvoiceAgingDto? _aging;
     private ComplianceSummaryDto? _compliance;
+    private List<TyreListItemDto>? _tyres;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -646,6 +720,7 @@ else
             _fuelEntries = await Api.GetFuelEntriesAsync();
             _aging = await Api.GetInvoiceAgingAsync();
             _compliance = await Api.GetComplianceSummaryAsync(30);
+            _tyres = await Api.GetTyresAsync();
         }
         catch (Exception ex)
         {
@@ -710,6 +785,17 @@ else
     private List<CustomerListItemDto> RecentCustomers =>
         (_customers ?? new())
             .OrderByDescending(c => c.Id)
+            .Take(5)
+            .ToList();
+
+    private int TyresInStockCount => _tyres?.Count(t => t.Status == TyreStatus.InStock) ?? 0;
+    private int TyresFittedCount => _tyres?.Count(t => t.Status == TyreStatus.Fitted) ?? 0;
+    private decimal? WorstTyreCostPerKm => (_tyres ?? new()).Where(t => t.CostPerKm.HasValue).Select(t => t.CostPerKm).OrderByDescending(c => c).FirstOrDefault();
+
+    private List<TyreListItemDto> WorstTyres =>
+        (_tyres ?? new())
+            .Where(t => t.CostPerKm.HasValue)
+            .OrderByDescending(t => t.CostPerKm)
             .Take(5)
             .ToList();
 

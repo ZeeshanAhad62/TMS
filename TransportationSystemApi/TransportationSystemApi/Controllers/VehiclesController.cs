@@ -99,6 +99,30 @@ public class VehiclesController : ControllerBase
         await _db.FuelEntries.Where(f => f.VehicleId == id && f.TripId != null)
             .ExecuteUpdateAsync(s => s.SetProperty(f => f.TripId, (int?)null));
 
+        // Tyres.VehicleId uses ON DELETE SET NULL (see migration 012) so a tyre's
+        // asset/event history survives its vehicle being deleted. The FK alone only
+        // nulls the column, so unassign each fitted tyre back to stock here (carrying
+        // its distance-run forward and logging the removal) to keep Status consistent.
+        var fittedTyres = await _db.Tyres.Where(t => t.VehicleId == id && t.Status == TyreStatus.Fitted).ToListAsync();
+        foreach (var tyre in fittedTyres)
+        {
+            var stint = tyre.InstallationOdometer is decimal baseOdo
+                ? Math.Max(0, (vehicle.CurrentOdometerReading ?? baseOdo) - baseOdo)
+                : 0;
+            tyre.TotalDistanceRunCarried += stint;
+            tyre.Status = TyreStatus.InStock;
+            tyre.InstallationDate = null;
+            tyre.InstallationOdometer = null;
+
+            _db.TyreEvents.Add(new TyreEvent
+            {
+                TyreId = tyre.Id,
+                EventType = TyreEventType.Remove,
+                EventDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                Notes = "Vehicle deleted"
+            });
+        }
+
         _db.Vehicles.Remove(vehicle);
         await _db.SaveChangesAsync();
         return NoContent();

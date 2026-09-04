@@ -98,6 +98,15 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @(SubLinkClass("/tyres") == "active" ? "active-module" : "")" title="Tyre Management">
+                    <i class="bi bi-circle"></i> <span class="nav-text">Tyre Management</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/tyres")" href="/tyres" title="Tyre List">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Tyre List</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/compliance") == "active" ? "active-module" : "")" title="Compliance">
                     <i class="bi bi-shield-check"></i> <span class="nav-text">Compliance</span>
                 </div>

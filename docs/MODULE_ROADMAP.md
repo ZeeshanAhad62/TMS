@@ -4,7 +4,7 @@ Living document. Tracks planned modules, build order, and the per-module steps.
 Update the checkboxes and the "Status" line as work lands.
 
 - **Stack:** Blazor Web (`TransportationSystemWeb`) · .NET API (`TransportationSystemApi`) · shared DTOs (`TransportationSystemShared`) · SQL Server (`FleetMasterDb`).
-- **Migrations:** plain numbered `.sql` files in `TransportationSystemApi/TransportationSystemApi/Database/`, run manually with `sqlcmd`. No EF migrations, no auto-apply. Latest applied: `011_ComplianceAlerts.sql`.
+- **Migrations:** plain numbered `.sql` files in `TransportationSystemApi/TransportationSystemApi/Database/`, run manually with `sqlcmd`. No EF migrations, no auto-apply. Latest applied: `012_TyreManagement.sql`.
 - **Dev DB:** `FleetMasterDb` on `localhost`, `sa` / `123qwe`.
 
 ---
@@ -63,7 +63,7 @@ Rationale: turn the app from record-keeping into an operations-and-money system.
 ### Tier 2 — strongly expected
 
 - [x] **5. Compliance & Document-Expiry Alert Engine** — done. Dashboard + API (`35d966c`) plus `AlertConfig` / `AlertLog` tables and a daily SMTP hosted service (`011`). Deferred: an optional `ExpiryDate` on uploaded `VehicleDocument` / `DriverDocument` (out of scope — the engine reads the structured expiry fields already on `Vehicle` / `Driver`, not uploaded files).
-- [ ] **6. Tyre Management (promote to full module)**
+- [x] **6. Tyre Management (promote to full module)** — done (`012`).
 - [ ] **7. Spare Parts Inventory / Stores**
 - [ ] **8. Driver Payroll / Settlements & Advances**
 - [ ] **9. GPS / Live Tracking integration**
@@ -165,17 +165,22 @@ _Built. `InvoiceLine.IsBilled`-style "billed?" column on the Trip **list** was d
 - **Depends on:** Fleet + Drivers (done). Existing `AlertRule` model was left as-is (still vehicle-scoped, used by `VehicleAlertsController`) — not folded in, to keep this module's scope to the compliance-wide engine.
 - **Verified via API + browser:** CRUD on `AlertConfig` (create/update/deactivate/delete), `run-alerts` with 7 pre-existing expired vehicle/driver documents (`itemsScanned: 7`), 0 sent while `Smtp:Host` is unconfigured (no crash, warning logged), inactive configs excluded from the scan, dedupe index in place. Dev DB clean (no leftover `AlertConfigs` / `AlertLog` rows).
 
-### 6. Tyre Management (promote to full module)
+### 6. Tyre Management (promote to full module) — DONE (`012`)
 
 **Goal:** track each tyre as an asset across its life, cost-per-km, inventory.
 
-- **Existing:** `Tyre`, `TyreReplacementHistory`, `VehicleTyresController` (currently nested under Fleet).
-- **Migration:** `011_TyreManagement.sql` — extend `dbo.Tyres` (serial/brand/pattern, purchase date/cost, current position code e.g. `FL/FR/RL1`, status `InStock`/`Fitted`/`Retreaded`/`Scrapped`, current odometer-at-fit, total distance run), new `dbo.TyreEvents` (fit / remove / rotate / retread / inspect / scrap with odometer + cost + notes), `dbo.TyreStock` for unfitted tyres.
-- **Derived:** `DistanceRun` = current vehicle odometer − odometer-at-fit + carried distance; `CostPerKm` = (purchase + retread costs) / DistanceRun.
-- **Endpoints:** `api/tyres` CRUD, `api/tyres/{id}/events` nested, `api/tyres/stock`. Vehicle tyre-position map endpoint.
-- **UI:** `Pages/Tyres/TyreList.razor` (status + vehicle + brand filters) + `TyreEditor.razor` (tabbed: `Details` / `Events`). A visual axle/position map on the vehicle editor.
-- **Dashboard:** tyres due for rotation, worst cost-per-km, stock count.
-- **Depends on:** Vehicles (done). Migrate existing tyre data forward.
+- **Existing (untouched):** the nested `api/vehicles/{id}/tyres` (`VehicleTyresController`) and its `TyreDto`/`TyreUpsertDto`/`TyreReplacementHistoryDto` stay exactly as they were — still the vehicle editor's quick "add a tyre" tab. `VehicleTyresController.Create` now also seeds a `TyreEvents` Fit row and defaults `Status = Fitted` so tyres added there aren't invisible to the new module.
+- **Migration:** `012_TyreManagement.sql` — `dbo.Tyres.VehicleId` made nullable (`ON DELETE SET NULL`, was `NOT NULL`/`CASCADE`) so a tyre's asset/event history survives past the vehicle it was last fitted to; new columns `SerialNumber`, `Pattern`, `PurchaseDate`, `PurchaseCost`, `Status`, `TotalDistanceRunCarried`, `CreatedAt`, `UpdatedAt`. New `dbo.TyreEvents` (fit / remove / rotate / retread / inspect / scrap, `ON DELETE CASCADE` from `Tyres`). `VehiclesController.Delete` unassigns any still-fitted tyres back to stock (carrying distance forward, logging a Remove event) before the vehicle row goes, since the FK alone only nulls the column.
+- **Deliberate deviations from the original spec, disclosed here:**
+  - **`dbo.TyreStock` was not built as a separate table.** "Stock" is modeled as `Tyre` rows with `VehicleId IS NULL` — one asset table for a tyre's whole life instead of a copy-in/copy-out dance between two tables when it's pulled or refitted. `GET api/tyres/stock` is a thin filter over the same table.
+  - **`TyreStatus` has 3 values, not 4** (`InStock` / `Fitted` / `Scrapped` — no standalone `Retreaded`). A retread doesn't change where a tyre physically is, so a 4th status would overlap with the other 3; retread history instead lives in `TyreEvents` and surfaces as `RetreadCount` / `LastRetreadDate` (derived).
+  - **No visual axle/position map** on the vehicle editor — deferred; the position data it would need is already exposed via the nested tyre list and `Tyre.Position`.
+  - **Existing `AlertRule` model left alone** (unrelated, no change needed here).
+- **Derived (in `TyreMapper`, not stored):** `DistanceRun` = `TotalDistanceRunCarried` + (if `Fitted`: current vehicle odometer − `InstallationOdometer`, floored at 0). `CostPerKm` = (`PurchaseCost` + Σ retread event costs) / `DistanceRun`, null until there's billable distance.
+- **Endpoints:** `api/tyres` CRUD + `status`/`vehicleId`/`search` filters, `api/tyres/stock`, `api/tyres/{id}/events` (`GET`/`POST`/`DELETE`). `POST .../events` is the only way fitment changes — Fit/Remove/Rotate/Retread/Inspect/Scrap each validate the tyre's current state (e.g. can't fit an already-fitted tyre, can't rotate one that's in stock, can't retread one still on a vehicle, nothing works on a scrapped one) and keep `Status`/`VehicleId`/`Position`/`InstallationOdometer` in lock-step with the log.
+- **UI:** `Pages/Tyres/TyreList.razor` (status/vehicle/brand search + KPI tiles) + `TyreEditor.razor` (tabbed `Details` / `Events`, event form adapts to the selected event type). Sidebar "Tyre Management" module; Home dashboard section (in-stock / fitted counts, worst cost/km, "Tyres to Watch" list); quick-link button.
+- **Depends on:** Vehicles (done). Existing tyre data migrated forward automatically (existing rows default to `Status = Fitted`, matching the fact that migration 001 required every tyre to have a `VehicleId`).
+- **Verified via API + browser:** full lifecycle (Fit → Rotate → Remove → Retread → re-Fit → Scrap) with correct `DistanceRun`/`CostPerKm` math at each step; invalid-transition rejections (double-fit, rotate/retread from the wrong state, any event on a scrapped tyre) all return 400; nested vehicle-tab create still works and seeds an event; deleting a vehicle unassigns its fitted tyres back to stock instead of destroying their history; top-level create/edit/delete and the Events tab exercised end-to-end in the browser with no console errors. Dev DB left clean.
 
 ### 7. Spare Parts Inventory / Stores
 
@@ -240,6 +245,7 @@ _Built. `InvoiceLine.IsBilled`-style "billed?" column on the Trip **list** was d
 
 | Date | Module | Commit | Notes |
 |---|---|---|---|
+| 2026-09-05 | Tyre Management (module 6) | _pending_ | Migration 012: `dbo.Tyres.VehicleId` nullable (`ON DELETE SET NULL`) + new columns (`SerialNumber`/`Pattern`/`PurchaseDate`/`PurchaseCost`/`Status`/`TotalDistanceRunCarried`/`CreatedAt`/`UpdatedAt`), new `dbo.TyreEvents`. `TyreEvent` model, `TyreStatus`/`TyreEventType` enums, `TyreMapper`, `TyresController` (`api/tyres` CRUD + `stock` + `{id}/events`). `VehiclesController.Delete` now unassigns fitted tyres to stock (carrying distance, logging a Remove event) before the vehicle cascade. `VehicleTyresController.Create` seeds a matching Fit event; nested tab otherwise untouched. `FleetApiClient` methods (`*TyreRecord*`/`*TyreEvent*`, distinct from the existing nested `*Tyre*` methods). `Pages/Tyres/TyreList.razor` + `TyreEditor.razor` (tabbed Details/Events); sidebar + Home dashboard section + quick-link. Verified via API (full Fit→Rotate→Remove→Retread→re-Fit→Scrap lifecycle, distance/cost-per-km math, all invalid-transition 400s, vehicle-delete cascade) and browser (create → fit event → list → delete, no console errors). Dev DB clean — note: cascade testing deleted then recreated the pre-existing placeholder vehicle `VEH-00004` (now `VEH-00005`, same reg/make/model). **Module 6 complete.**
 | 2026-09-05 | Compliance alert config + delivery (module 5 completion) | `b13e871` | Migration 011: `dbo.AlertConfigs` + `dbo.AlertLog` (unique dedupe index on entity/document/expiry/severity). `AlertConfig` / `AlertLog` models, `AlertConfigMapper`, `AlertConfigsController` (`api/compliance/config` CRUD), `ComplianceController` gained `document-types` / `alert-log` / `run-alerts`. `IEmailSender` + `SmtpEmailSender` (System.Net.Mail, no-op-with-warning when `Smtp:Host` unset) + `ComplianceAlertService` (shared scan/match/send logic) + `ComplianceAlertHostedService` (24h timer, configurable via `Compliance:AlertScanIntervalHours`). `FleetApiClient` methods; `Pages/Compliance/AlertSettings.razor` (add/deactivate/delete rules, Run Now, recent activity); sidebar sub-link. Verified via API (CRUD, 7 expired items scanned, 0 sent without SMTP configured, inactive-config skip) and browser (add rule → Run Now → deactivate → delete, no console errors, existing Compliance dashboard unaffected). Dev DB clean. **Module 5 complete.**
 | 2026-09-01 | Roadmap created | — | This document. |
 | 2026-09-01 | Customer Master (CRUD) | `e757dc8` | `dbo.Customers` (migration 006, applied to dev DB). `Customer` model + `CustomerStatus` enum, `CustomerDtos`, `CustomerMapper`, `CustomersController` (`api/customers`), `FleetApiClient` methods, `Customers/CustomerList.razor` + `CustomerEditor.razor` (single card), sidebar nav, Home dashboard section. Full CRUD + search + validation verified via API. |

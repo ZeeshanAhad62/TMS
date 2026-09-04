@@ -32,6 +32,7 @@ public class FleetDbContext : DbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<AlertConfig> AlertConfigs => Set<AlertConfig>();
     public DbSet<AlertLog> AlertLog => Set<AlertLog>();
+    public DbSet<TyreEvent> TyreEvents => Set<TyreEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -80,7 +81,7 @@ public class FleetDbContext : DbContext
             entity.HasMany(v => v.Tyres)
                 .WithOne(t => t.Vehicle)
                 .HasForeignKey(t => t.VehicleId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasMany(v => v.MaintenanceRecords)
                 .WithOne(m => m.Vehicle)
@@ -91,11 +92,24 @@ public class FleetDbContext : DbContext
         modelBuilder.Entity<Tyre>(entity =>
         {
             entity.Property(t => t.InstallationOdometer).HasPrecision(18, 2);
+            entity.Property(t => t.PurchaseCost).HasPrecision(18, 2);
+            entity.Property(t => t.TotalDistanceRunCarried).HasPrecision(18, 2);
 
             entity.HasMany(t => t.ReplacementHistory)
                 .WithOne(r => r.Tyre)
                 .HasForeignKey(r => r.TyreId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(t => t.Events)
+                .WithOne(e => e.Tyre)
+                .HasForeignKey(e => e.TyreId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TyreEvent>(entity =>
+        {
+            entity.Property(e => e.Odometer).HasPrecision(18, 2);
+            entity.Property(e => e.Cost).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<TyreReplacementHistory>(entity =>

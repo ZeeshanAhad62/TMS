@@ -76,6 +76,23 @@ public enum TyrePosition
     Other
 }
 
+public enum TyreStatus
+{
+    InStock,
+    Fitted,
+    Scrapped
+}
+
+public enum TyreEventType
+{
+    Fit,
+    Remove,
+    Rotate,
+    Retread,
+    Inspect,
+    Scrap
+}
+
 public enum MaintenanceType
 {
     OilChange,

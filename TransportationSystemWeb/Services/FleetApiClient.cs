@@ -605,6 +605,71 @@ public class FleetApiClient
         return (await response.Content.ReadFromJsonAsync<AlertRunResultDto>(JsonOptions))!;
     }
 
+    // ----- Tyre Management (module 6, top-level asset module) -----
+
+    public async Task<List<TyreListItemDto>> GetTyresAsync(TyreStatus? status = null, int? vehicleId = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (status.HasValue) query.Add($"status={status}");
+        if (vehicleId.HasValue) query.Add($"vehicleId={vehicleId}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+
+        return await _http.GetFromJsonAsync<List<TyreListItemDto>>($"api/tyres{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<List<TyreListItemDto>> GetTyreStockAsync()
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<List<TyreListItemDto>>("api/tyres/stock", JsonOptions) ?? new();
+    }
+
+    public async Task<TyreDetailDto?> GetTyreAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/tyres/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<TyreDetailDto>(JsonOptions);
+    }
+
+    public async Task<TyreDetailDto> CreateTyreRecordAsync(TyreCreateDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/tyres", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<TyreDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateTyreRecordAsync(int id, TyreCreateDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/tyres/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteTyreRecordAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/tyres/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<TyreEventDto> AddTyreEventAsync(int tyreId, TyreEventUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/tyres/{tyreId}/events", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<TyreEventDto>(JsonOptions))!;
+    }
+
+    public async Task DeleteTyreEventAsync(int tyreId, int eventId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/tyres/{tyreId}/events/{eventId}");
+        await EnsureSuccess(response);
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()
