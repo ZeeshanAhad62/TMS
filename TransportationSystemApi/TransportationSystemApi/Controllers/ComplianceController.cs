@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using TransportationSystemApi.Data;
 using TransportationSystemApi.Dtos;
 using TransportationSystemApi.Mapping;
+using TransportationSystemApi.Services;
 
 namespace TransportationSystemApi.Controllers;
 
@@ -11,10 +12,12 @@ namespace TransportationSystemApi.Controllers;
 public class ComplianceController : ControllerBase
 {
     private readonly FleetDbContext _db;
+    private readonly ComplianceAlertService _alertService;
 
-    public ComplianceController(FleetDbContext db)
+    public ComplianceController(FleetDbContext db, ComplianceAlertService alertService)
     {
         _db = db;
+        _alertService = alertService;
     }
 
     private async Task<List<ComplianceItemDto>> ScanAsync(int withinDays)
@@ -58,5 +61,25 @@ public class ComplianceController : ControllerBase
         withinDays = Math.Clamp(withinDays, 0, 3650);
         var items = await ScanAsync(withinDays);
         return ComplianceScanner.Summarise(items);
+    }
+
+    [HttpGet("document-types")]
+    public ActionResult<string[]> GetDocumentTypes() => ComplianceScanner.KnownDocumentTypes;
+
+    [HttpGet("alert-log")]
+    public async Task<ActionResult<List<AlertLogDto>>> GetAlertLog([FromQuery] int take = 50)
+    {
+        take = Math.Clamp(take, 1, 500);
+        var log = await _db.AlertLog.AsNoTracking()
+            .OrderByDescending(l => l.SentAt)
+            .Take(take)
+            .ToListAsync();
+        return log.Select(AlertConfigMapper.ToLogDto).ToList();
+    }
+
+    [HttpPost("run-alerts")]
+    public async Task<ActionResult<AlertRunResultDto>> RunAlertsNow(CancellationToken ct)
+    {
+        return await _alertService.RunScanAsync(ct);
     }
 }

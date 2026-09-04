@@ -1,0 +1,279 @@
+@page "/compliance/alert-settings"
+@attribute [Authorize]
+@inject FleetApiClient Api
+
+<PageTitle>Alert Settings - Compliance</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Compliance Alert Settings</h2>
+        <div class="text-muted small">Compliance &rsaquo; Alert Settings</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="/compliance"><i class="bi bi-arrow-left me-1"></i>Back to Expiry Tracker</a>
+        <button class="btn btn-primary" @onclick="RunNow" disabled="@_running">
+            <i class="bi bi-envelope-check me-1"></i>@(_running ? "Running..." : "Run Now")
+        </button>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+@if (_runResult is not null)
+{
+    <div class="alert alert-success">
+        Scan complete: @_runResult.ItemsScanned item(s) checked, @_runResult.AlertsSent new alert(s) emailed.
+    </div>
+}
+
+<div class="card mb-3"><div class="card-body">
+    <h5 class="card-title">Add Alert Rule</h5>
+    <div class="text-muted small mb-3">
+        The daily job compares each expiring document's days-remaining against the rule's threshold. Once an
+        (entity, document, expiry date, severity) combination has been emailed, it will not be re-sent unless
+        severity escalates or the document is renewed.
+    </div>
+    <div class="row g-2 align-items-end">
+        <div class="col-md-2">
+            <label class="form-label">Entity Type</label>
+            <select class="form-select" @bind="_newEntityType">
+                <option value="">Vehicles &amp; drivers</option>
+                <option value="Vehicle">Vehicles only</option>
+                <option value="Driver">Drivers only</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Document Type</label>
+            <select class="form-select" @bind="_newDocumentType">
+                <option value="">Any document type</option>
+                @foreach (var dt in _documentTypes)
+                {
+                    <option value="@dt">@dt</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Threshold (days)</label>
+            <input type="number" class="form-control" @bind="_newThresholdDays" min="0" max="3650" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Recipient Email(s)</label>
+            <input class="form-control" placeholder="ops@company.com, fleet@company.com" @bind="_newRecipients" />
+        </div>
+        <div class="col-md-1 d-grid">
+            <button type="button" class="btn btn-primary" @onclick="AddConfig"><i class="bi bi-plus-lg"></i></button>
+        </div>
+    </div>
+</div></div>
+
+@if (_configs is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="card mb-3"><div class="card-body">
+        <h5 class="card-title">Alert Rules</h5>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead class="table-light">
+                    <tr><th>Entity</th><th>Document</th><th>Threshold</th><th>Recipients</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in _configs)
+                    {
+                        <tr>
+                            <td>@(c.EntityType?.ToString() ?? "Vehicles & drivers")</td>
+                            <td>@(c.DocumentType ?? "Any")</td>
+                            <td>&le; @c.ThresholdDays d</td>
+                            <td>@c.RecipientEmails</td>
+                            <td><span class="badge @(c.IsActive ? "bg-success" : "bg-secondary")">@(c.IsActive ? "Active" : "Inactive")</span></td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleActive(c)">
+                                    @(c.IsActive ? "Deactivate" : "Activate")
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteConfig(c.Id)"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    }
+                    @if (_configs.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-muted small">No alert rules configured yet. Nothing will be emailed until at least one rule is added.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div></div>
+}
+
+<div class="card"><div class="card-body">
+    <h5 class="card-title">Recent Alert Activity</h5>
+    @if (_log is null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else if (_log.Count == 0)
+    {
+        <div class="text-muted small">No alerts have been sent yet.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead class="table-light">
+                    <tr><th>Sent</th><th>Entity</th><th>Document</th><th>Expiry</th><th>Severity</th><th>Recipients</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var l in _log)
+                    {
+                        <tr>
+                            <td>@l.SentAt.ToLocalTime().ToString("dd-MMM-yyyy HH:mm")</td>
+                            <td>@l.EntityType #@l.EntityId</td>
+                            <td>@l.DocumentType</td>
+                            <td>@l.ExpiryDate.ToString("dd-MMM-yyyy")</td>
+                            <td><span class="badge @SeverityBadge(l.Severity)">@l.Severity</span></td>
+                            <td>@l.RecipientEmails</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div></div>
+
+@code {
+    private List<AlertConfigDto>? _configs;
+    private List<AlertLogDto>? _log;
+    private string[] _documentTypes = Array.Empty<string>();
+    private string? _error;
+    private bool _running;
+    private AlertRunResultDto? _runResult;
+
+    private string _newEntityType = "";
+    private string _newDocumentType = "";
+    private int _newThresholdDays = 30;
+    private string _newRecipients = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _documentTypes = await Api.GetComplianceDocumentTypesAsync();
+            _configs = await Api.GetAlertConfigsAsync();
+            _log = await Api.GetAlertLogAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load alert settings: {ex.Message}";
+            _configs ??= new();
+            _log ??= new();
+        }
+    }
+
+    private async Task AddConfig()
+    {
+        _error = null;
+        if (string.IsNullOrWhiteSpace(_newRecipients))
+        {
+            _error = "Enter at least one recipient email.";
+            return;
+        }
+
+        try
+        {
+            var dto = new AlertConfigUpsertDto
+            {
+                EntityType = string.IsNullOrEmpty(_newEntityType) ? null : Enum.Parse<ComplianceEntityType>(_newEntityType),
+                DocumentType = string.IsNullOrEmpty(_newDocumentType) ? null : _newDocumentType,
+                ThresholdDays = _newThresholdDays,
+                RecipientEmails = _newRecipients,
+                IsActive = true
+            };
+            await Api.CreateAlertConfigAsync(dto);
+
+            _newEntityType = "";
+            _newDocumentType = "";
+            _newThresholdDays = 30;
+            _newRecipients = "";
+
+            _configs = await Api.GetAlertConfigsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add alert rule: {ex.Message}";
+        }
+    }
+
+    private async Task ToggleActive(AlertConfigDto c)
+    {
+        _error = null;
+        try
+        {
+            var dto = new AlertConfigUpsertDto
+            {
+                EntityType = c.EntityType,
+                DocumentType = c.DocumentType,
+                ThresholdDays = c.ThresholdDays,
+                RecipientEmails = c.RecipientEmails,
+                IsActive = !c.IsActive
+            };
+            await Api.UpdateAlertConfigAsync(c.Id, dto);
+            _configs = await Api.GetAlertConfigsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to update alert rule: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteConfig(int id)
+    {
+        _error = null;
+        try
+        {
+            await Api.DeleteAlertConfigAsync(id);
+            _configs = await Api.GetAlertConfigsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete alert rule: {ex.Message}";
+        }
+    }
+
+    private async Task RunNow()
+    {
+        _error = null;
+        _runResult = null;
+        _running = true;
+        try
+        {
+            _runResult = await Api.RunAlertsNowAsync();
+            _log = await Api.GetAlertLogAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to run alert scan: {ex.Message}";
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private static string SeverityBadge(ComplianceSeverity s) => s switch
+    {
+        ComplianceSeverity.Expired => "bg-danger",
+        ComplianceSeverity.Critical => "bg-danger",
+        ComplianceSeverity.Warning => "bg-warning text-dark",
+        ComplianceSeverity.Upcoming => "bg-secondary",
+        _ => "bg-secondary"
+    };
+}

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TransportationSystemApi.Dtos;
 
 public enum ComplianceEntityType
@@ -37,4 +39,53 @@ public class ComplianceSummaryDto
     public int Total { get; set; }
     public int VehicleItems { get; set; }
     public int DriverItems { get; set; }
+}
+
+public class AlertConfigDto
+{
+    public int Id { get; set; }
+    public ComplianceEntityType? EntityType { get; set; }
+    public string? DocumentType { get; set; }
+    public int ThresholdDays { get; set; }
+    public string RecipientEmails { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+public class AlertConfigUpsertDto
+{
+    // null = watch both vehicles and drivers
+    public ComplianceEntityType? EntityType { get; set; }
+
+    // null = watch every document type
+    [MaxLength(100)]
+    public string? DocumentType { get; set; }
+
+    [Range(0, 3650)]
+    public int ThresholdDays { get; set; } = 30;
+
+    [Required, MaxLength(500)]
+    public string RecipientEmails { get; set; } = string.Empty;
+
+    public bool IsActive { get; set; } = true;
+}
+
+public class AlertLogDto
+{
+    public int Id { get; set; }
+    public ComplianceEntityType EntityType { get; set; }
+    public int EntityId { get; set; }
+    public string DocumentType { get; set; } = string.Empty;
+    public DateOnly ExpiryDate { get; set; }
+    public ComplianceSeverity Severity { get; set; }
+    public string RecipientEmails { get; set; } = string.Empty;
+    public DateTime SentAt { get; set; }
+}
+
+public class AlertRunResultDto
+{
+    public int ItemsScanned { get; set; }
+    public int AlertsSent { get; set; }
+    public DateTime RanAt { get; set; }
 }

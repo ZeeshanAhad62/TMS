@@ -31,6 +31,11 @@ builder.Services.AddDbContext<FleetDbContext>(options =>
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddHttpClient<GeoLocationService>();
 
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+builder.Services.AddScoped<ComplianceAlertService>();
+builder.Services.AddHostedService<ComplianceAlertHostedService>();
+
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key is not configured.");
 

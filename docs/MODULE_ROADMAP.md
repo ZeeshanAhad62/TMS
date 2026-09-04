@@ -4,7 +4,7 @@ Living document. Tracks planned modules, build order, and the per-module steps.
 Update the checkboxes and the "Status" line as work lands.
 
 - **Stack:** Blazor Web (`TransportationSystemWeb`) · .NET API (`TransportationSystemApi`) · shared DTOs (`TransportationSystemShared`) · SQL Server (`FleetMasterDb`).
-- **Migrations:** plain numbered `.sql` files in `TransportationSystemApi/TransportationSystemApi/Database/`, run manually with `sqlcmd`. No EF migrations, no auto-apply. Latest applied: `005_MaintenanceWorkshop.sql`.
+- **Migrations:** plain numbered `.sql` files in `TransportationSystemApi/TransportationSystemApi/Database/`, run manually with `sqlcmd`. No EF migrations, no auto-apply. Latest applied: `011_ComplianceAlerts.sql`.
 - **Dev DB:** `FleetMasterDb` on `localhost`, `sa` / `123qwe`.
 
 ---
@@ -62,7 +62,7 @@ Rationale: turn the app from record-keeping into an operations-and-money system.
 
 ### Tier 2 — strongly expected
 
-- [~] **5. Compliance & Document-Expiry Alert Engine** — **dashboard + API done** (no migration; `ComplianceScanner` static + `api/compliance/expiries` / `summary`, `ComplianceDashboard.razor`, Home banner). Remaining: `AlertConfig` / `AlertLog` tables + a daily email hosted service (SMTP) — its own "notification delivery" concern; and an optional `ExpiryDate` on uploaded `VehicleDocument` / `DriverDocument`.
+- [x] **5. Compliance & Document-Expiry Alert Engine** — done. Dashboard + API (`35d966c`) plus `AlertConfig` / `AlertLog` tables and a daily SMTP hosted service (`011`). Deferred: an optional `ExpiryDate` on uploaded `VehicleDocument` / `DriverDocument` (out of scope — the engine reads the structured expiry fields already on `Vehicle` / `Driver`, not uploaded files).
 - [ ] **6. Tyre Management (promote to full module)**
 - [ ] **7. Spare Parts Inventory / Stores**
 - [ ] **8. Driver Payroll / Settlements & Advances**
@@ -151,18 +151,19 @@ _Built. `InvoiceLine.IsBilled`-style "billed?" column on the Trip **list** was d
 - **Dashboard:** total outstanding, overdue amount, collected this month.
 - **Depends on:** Customer Master (#1); Trips (done).
 
-### 5. Compliance & Document-Expiry Alert Engine
+### 5. Compliance & Document-Expiry Alert Engine — DONE (`011`)
 
 **Goal:** one dashboard for every expiring document + scheduled email reminders.
 
-- **Sources already in DB:** `Vehicle` — RC / fitness / permit / insurance / pollution / tax expiry dates. `Driver` — `LicenseExpiryDate`. `VehicleDocument` / `DriverDocument` — uploaded docs (add optional `ExpiryDate` if missing).
-- **Migration:** `010_ComplianceAlerts.sql` → `dbo.AlertConfigs` (which document types to watch, lead-time days, recipient emails), `dbo.AlertLog` (what was sent, when — dedupe).
-- **Service:** `ComplianceService` — scans all sources, produces a unified list `{ EntityType, EntityId, EntityName, DocumentType, ExpiryDate, DaysRemaining, Severity }`. Severity: expired / ≤7 / ≤30 / ≤60.
-- **Notifications:** a `BackgroundService` (hosted service) runs daily, uses `AlertConfig` lead times, sends email via SMTP (add `SmtpOptions` to config), writes `AlertLog` to avoid re-sending.
-- **Endpoints:** `GET api/compliance/expiries` (with severity + entityType filters), `api/compliance/config` CRUD.
-- **UI:** `Pages/Compliance/ComplianceDashboard.razor` — grouped table, severity colour, click-through to the vehicle/driver editor. `Pages/Compliance/AlertSettings.razor`.
-- **Dashboard:** "X documents expiring in 30 days" headline with drill-in.
-- **Depends on:** Fleet + Drivers (done). Existing `AlertRule` model — decide whether to fold it in or leave it vehicle-scoped.
+- **Sources already in DB:** `Vehicle` — RC / fitness / permit / insurance / pollution / tax expiry dates. `Driver` — `LicenseExpiryDate`. (`VehicleDocument` / `DriverDocument` uploaded-file `ExpiryDate` stayed deferred — the engine only reads the structured fields above.)
+- **Migration:** `011_ComplianceAlerts.sql` → `dbo.AlertConfigs` (nullable `EntityType` / `DocumentType` = wildcard, `ThresholdDays`, `RecipientEmails`, `IsActive`), `dbo.AlertLog` (what was sent, when; unique index on `EntityType, EntityId, DocumentType, ExpiryDate, Severity` is the dedupe key — re-alerts only on severity escalation or a renewed expiry date).
+- **Service:** `ComplianceScanner` (existing, `35d966c`) produces the unified `{ EntityType, EntityId, EntityName, DocumentType, ExpiryDate, DaysRemaining, Severity }` list; `ComplianceAlertService` (new, scoped) matches it against active `AlertConfig` rows and emails via `IEmailSender`.
+- **Notifications:** `ComplianceAlertHostedService` (`BackgroundService`) runs on a timer, default every 24h (`Compliance:AlertScanIntervalHours`), first run right after startup. `SmtpEmailSender` wraps `System.Net.Mail`; `Smtp:Host` empty (the dev default) makes `TrySendAsync` log a warning and return `false` instead of throwing, so the job runs safely with no mail server configured.
+- **Endpoints:** `GET api/compliance/expiries` / `summary` (existing) + `GET api/compliance/document-types`, `api/compliance/config` CRUD (`AlertConfigsController`), `GET api/compliance/alert-log`, `POST api/compliance/run-alerts` (manual trigger, used by the UI's "Run Now").
+- **UI:** `Pages/Compliance/ComplianceDashboard.razor` (existing). `Pages/Compliance/AlertSettings.razor` (new) — add/deactivate/delete alert rules, "Run Now" button, recent alert-activity table. Sidebar gained an "Alert Settings" sub-link under Compliance.
+- **Dashboard:** "X documents expiring in 30 days" headline (existing, `35d966c`) — unchanged.
+- **Depends on:** Fleet + Drivers (done). Existing `AlertRule` model was left as-is (still vehicle-scoped, used by `VehicleAlertsController`) — not folded in, to keep this module's scope to the compliance-wide engine.
+- **Verified via API + browser:** CRUD on `AlertConfig` (create/update/deactivate/delete), `run-alerts` with 7 pre-existing expired vehicle/driver documents (`itemsScanned: 7`), 0 sent while `Smtp:Host` is unconfigured (no crash, warning logged), inactive configs excluded from the scan, dedupe index in place. Dev DB clean (no leftover `AlertConfigs` / `AlertLog` rows).
 
 ### 6. Tyre Management (promote to full module)
 
@@ -226,9 +227,9 @@ _Built. `InvoiceLine.IsBilled`-style "billed?" column on the Trip **list** was d
 
 ## Cross-cutting TODO (not modules)
 
-- [ ] Notification delivery channel (SMTP now; SMS later) — first needed by #5.
+- [x] Notification delivery channel (SMTP now; SMS later) — done for SMTP via `IEmailSender` / `SmtpEmailSender` (module 5, `011`). SMS still open, first needed if/when a channel beyond email is required.
 - [ ] Map/JS library baseline (Leaflet) — first needed by #9.
-- [ ] Background/hosted service host — first needed by #5.
+- [x] Background/hosted service host — done via `ComplianceAlertHostedService` (module 5, `011`); reusable pattern for future scheduled jobs (e.g. #9's tracking poller).
 - [ ] Consolidated `EnumDisplay` entries for every new enum.
 - [ ] Extend `ReportsController` summary + `ReportsDashboard.razor` as each money module lands. **Owed:** (a) a Fuel section (month spend, fleet avg mileage, cost/km by vehicle, top spenders) — not added after module 2; (b) a Trip P&L section (most/least profitable trips, profit by customer, profit by vehicle) + `NetProfit` column on the Trip list — not added after module 3.
 - [ ] Retire dead `ComingSoon.razor` + `/modules/coming-soon/{slug}` route once no longer referenced.
@@ -239,6 +240,7 @@ _Built. `InvoiceLine.IsBilled`-style "billed?" column on the Trip **list** was d
 
 | Date | Module | Commit | Notes |
 |---|---|---|---|
+| 2026-09-05 | Compliance alert config + delivery (module 5 completion) | _pending_ | Migration 011: `dbo.AlertConfigs` + `dbo.AlertLog` (unique dedupe index on entity/document/expiry/severity). `AlertConfig` / `AlertLog` models, `AlertConfigMapper`, `AlertConfigsController` (`api/compliance/config` CRUD), `ComplianceController` gained `document-types` / `alert-log` / `run-alerts`. `IEmailSender` + `SmtpEmailSender` (System.Net.Mail, no-op-with-warning when `Smtp:Host` unset) + `ComplianceAlertService` (shared scan/match/send logic) + `ComplianceAlertHostedService` (24h timer, configurable via `Compliance:AlertScanIntervalHours`). `FleetApiClient` methods; `Pages/Compliance/AlertSettings.razor` (add/deactivate/delete rules, Run Now, recent activity); sidebar sub-link. Verified via API (CRUD, 7 expired items scanned, 0 sent without SMTP configured, inactive-config skip) and browser (add rule → Run Now → deactivate → delete, no console errors, existing Compliance dashboard unaffected). Dev DB clean. **Module 5 complete.**
 | 2026-09-01 | Roadmap created | — | This document. |
 | 2026-09-01 | Customer Master (CRUD) | `e757dc8` | `dbo.Customers` (migration 006, applied to dev DB). `Customer` model + `CustomerStatus` enum, `CustomerDtos`, `CustomerMapper`, `CustomersController` (`api/customers`), `FleetApiClient` methods, `Customers/CustomerList.razor` + `CustomerEditor.razor` (single card), sidebar nav, Home dashboard section. Full CRUD + search + validation verified via API. |
 | 2026-09-01 | Trip ↔ Customer link | `e91ae4e` | Migration 007: nullable `dbo.Trips.CustomerId` → `Customers`, `ON DELETE SET NULL`. `TripUpsertDto.CustomerId`, `CustomerName` on DTOs, `customerId` filter, TripEditor picker + TripList column/filter. Verified: customerName flows through; deleting a customer nulls its trips' CustomerId. **Module 1 complete.** |

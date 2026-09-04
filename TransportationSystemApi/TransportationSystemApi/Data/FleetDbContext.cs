@@ -30,6 +30,8 @@ public class FleetDbContext : DbContext
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<AlertConfig> AlertConfigs => Set<AlertConfig>();
+    public DbSet<AlertLog> AlertLog => Set<AlertLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -248,6 +250,11 @@ public class FleetDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(f => f.TripId)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<AlertLog>(entity =>
+        {
+            entity.HasIndex(l => new { l.EntityType, l.EntityId, l.DocumentType, l.ExpiryDate, l.Severity }).IsUnique();
         });
     }
 }

@@ -555,6 +555,56 @@ public class FleetApiClient
         return await response.Content.ReadFromJsonAsync<ComplianceSummaryDto>(JsonOptions);
     }
 
+    public async Task<string[]> GetComplianceDocumentTypesAsync()
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<string[]>("api/compliance/document-types", JsonOptions) ?? Array.Empty<string>();
+    }
+
+    // ----- Compliance Alert Config -----
+
+    public async Task<List<AlertConfigDto>> GetAlertConfigsAsync()
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<List<AlertConfigDto>>("api/compliance/config", JsonOptions) ?? new();
+    }
+
+    public async Task<AlertConfigDto> CreateAlertConfigAsync(AlertConfigUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/compliance/config", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<AlertConfigDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateAlertConfigAsync(int id, AlertConfigUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/compliance/config/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteAlertConfigAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/compliance/config/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<List<AlertLogDto>> GetAlertLogAsync(int take = 50)
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<List<AlertLogDto>>($"api/compliance/alert-log?take={take}", JsonOptions) ?? new();
+    }
+
+    public async Task<AlertRunResultDto> RunAlertsNowAsync()
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsync("api/compliance/run-alerts", null);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<AlertRunResultDto>(JsonOptions))!;
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

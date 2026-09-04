@@ -10,6 +10,14 @@ public static class ComplianceScanner
 {
     public const int DefaultWindowDays = 60;
 
+    // Every DocumentType label this scanner can produce -- used to populate
+    // the AlertConfig document-type picker instead of free text.
+    public static readonly string[] KnownDocumentTypes =
+    {
+        "Registration Certificate", "Fitness Certificate", "Route Permit",
+        "Insurance", "Pollution Certificate", "Road Tax", "Driving License"
+    };
+
     public static List<ComplianceItemDto> Scan(
         IEnumerable<Vehicle> vehicles,
         IEnumerable<Driver> drivers,
