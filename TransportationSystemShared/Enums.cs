@@ -203,3 +203,16 @@ public enum PaymentMode
     Cheque,
     Online
 }
+
+public enum PartMovementType
+{
+    Receipt,
+    Issue,
+    Adjust
+}
+
+public enum StockMovementReferenceType
+{
+    Manual,
+    WorkOrder
+}

@@ -4,7 +4,7 @@ Living document. Tracks planned modules, build order, and the per-module steps.
 Update the checkboxes and the "Status" line as work lands.
 
 - **Stack:** Blazor Web (`TransportationSystemWeb`) · .NET API (`TransportationSystemApi`) · shared DTOs (`TransportationSystemShared`) · SQL Server (`FleetMasterDb`).
-- **Migrations:** plain numbered `.sql` files in `TransportationSystemApi/TransportationSystemApi/Database/`, run manually with `sqlcmd`. No EF migrations, no auto-apply. Latest applied: `012_TyreManagement.sql`.
+- **Migrations:** plain numbered `.sql` files in `TransportationSystemApi/TransportationSystemApi/Database/`, run manually with `sqlcmd`. No EF migrations, no auto-apply. Latest applied: `013_PartsInventory.sql`.
 - **Dev DB:** `FleetMasterDb` on `localhost`, `sa` / `123qwe`.
 
 ---
@@ -64,7 +64,7 @@ Rationale: turn the app from record-keeping into an operations-and-money system.
 
 - [x] **5. Compliance & Document-Expiry Alert Engine** — done. Dashboard + API (`35d966c`) plus `AlertConfig` / `AlertLog` tables and a daily SMTP hosted service (`011`). Deferred: an optional `ExpiryDate` on uploaded `VehicleDocument` / `DriverDocument` (out of scope — the engine reads the structured expiry fields already on `Vehicle` / `Driver`, not uploaded files).
 - [x] **6. Tyre Management (promote to full module)** — done (`012`).
-- [ ] **7. Spare Parts Inventory / Stores**
+- [x] **7. Spare Parts Inventory / Stores** — done (`013`).
 - [ ] **8. Driver Payroll / Settlements & Advances**
 - [ ] **9. GPS / Live Tracking integration**
 
@@ -182,17 +182,19 @@ _Built. `InvoiceLine.IsBilled`-style "billed?" column on the Trip **list** was d
 - **Depends on:** Vehicles (done). Existing tyre data migrated forward automatically (existing rows default to `Status = Fitted`, matching the fact that migration 001 required every tyre to have a `VehicleId`).
 - **Verified via API + browser:** full lifecycle (Fit → Rotate → Remove → Retread → re-Fit → Scrap) with correct `DistanceRun`/`CostPerKm` math at each step; invalid-transition rejections (double-fit, rotate/retread from the wrong state, any event on a scrapped tyre) all return 400; nested vehicle-tab create still works and seeds an event; deleting a vehicle unassigns its fitted tyres back to stock instead of destroying their history; top-level create/edit/delete and the Events tab exercised end-to-end in the browser with no console errors. Dev DB left clean.
 
-### 7. Spare Parts Inventory / Stores
+### 7. Spare Parts Inventory / Stores — DONE (`013`)
 
 **Goal:** real stock for parts, linked to work-order consumption.
 
-- **Migration:** `012_PartsInventory.sql` → `dbo.Parts` (part master: number, name, unit, reorder level, standard cost), `dbo.StockMovements` (receipt / issue / adjust with qty, unit cost, ref to WO or PO), `dbo.Suppliers` (if not added by #11).
-- **WorkOrderItem change:** optional `PartId` FK; issuing a `WorkOrderItem` against a stocked part creates an `issue` `StockMovement` and decrements on-hand.
-- **Derived:** on-hand qty = Σ movements; below-reorder flag; stock value.
-- **Endpoints:** `api/parts` CRUD, `api/parts/{id}/movements`, `GET api/parts/low-stock`.
-- **UI:** `Pages/Inventory/PartList.razor` + `PartEditor.razor` (tabbed: `Details` / `Stock Movements`). Goods-receipt screen.
-- **Dashboard:** low-stock count, total stock value.
-- **Depends on:** Maintenance module (done) for the WO link; Vendors (#11) optional.
+- **Migration:** `013_PartsInventory.sql` → `dbo.Parts` (part master: number, name, unit, reorder level, standard cost), `dbo.StockMovements` (Receipt / Issue / Adjust, qty, unit cost, generic `ReferenceType`/`ReferenceId` soft link -- today only `WorkOrder`, kept generic so a future `PurchaseOrder` reference needs no schema change). `dbo.WorkOrderItems` gains nullable `PartId` (FK, `ON DELETE SET NULL`) and `StockMovementId` (soft link, no FK) tying a line to the Issue movement it created.
+- **Deliberate deviation, disclosed here:** no `dbo.Suppliers` table -- that's Vendor-master territory owned by module 11 when it lands. `StockMovements.SupplierName` is free text for receipts in the meantime.
+- **WorkOrderItem change:** issuing a line against a stocked part (`PartId` set) auto-creates an Issue `StockMovement` and decrements on-hand; editing the line's quantity/part keeps that movement in sync, and deleting the line (or the whole work order) deletes the movement, restoring on-hand. Direct edits to a work-order-linked movement are blocked from the Parts side (`400`) -- edit the line instead.
+- **Derived (in `PartMapper`, not stored):** on-hand qty = Σ movements (Receipt +, Issue −, Adjust as entered); stock value = on-hand × `StandardCost`; below-reorder = on-hand < `ReorderLevel`.
+- **Endpoints:** `api/parts` CRUD (rejects duplicate `PartNumber`), `api/parts/{id}/movements` (`GET`/`POST` manual only/`DELETE` with the work-order-linked guard above), `GET api/parts/low-stock`.
+- **UI:** `Pages/Inventory/PartList.razor` (search + KPI tiles) + `PartEditor.razor` (tabbed `Details` / `Stock Movements`) + `GoodsReceipt.razor` (multi-line batch receipt, one Receipt movement per line). `WorkOrderEditor.razor`'s Parts & Materials tab gained an optional stocked-part picker. Sidebar "Spare Parts Inventory" module; Home dashboard section (total / below-reorder / stock value + reorder list); quick-link.
+- **Depends on:** Maintenance module (done) for the WO link; Vendors (#11) optional, not built.
+- **Bug found + fixed during verification:** `WorkOrdersController.Delete` deleted a work order via DB cascade (which removes its `WorkOrderItems`) without also deleting the `StockMovement` rows those items had created -- on-hand stayed decremented and the movement was orphaned (`ReferenceId` pointing at a now-gone work order). Fixed by deleting those movements explicitly before the work order, mirroring the existing `VehiclesController.Delete` pattern for `FuelEntries`/`Tyres`. Also missing: `.ThenInclude(i => i.Part)` on `WorkOrdersController`'s `GetAll`/`GetById` queries, which left `WorkOrderItemDto.PartNumber` null even when a line was linked -- added.
+- **Verified via API + browser:** part CRUD + duplicate-number rejection; Receipt/Issue/Adjust math and the below-reorder flag; linking a work-order line to a part auto-issues and decrements on-hand; changing that line's quantity keeps the movement in sync; deleting the line restores on-hand; deleting a movement created from a work-order line is blocked (`400`); deleting the work order itself now correctly restores on-hand (post-fix); Goods Receipt screen recording a batch line. Dev DB left clean.
 
 ### 8. Driver Payroll / Settlements & Advances
 
@@ -245,6 +247,7 @@ _Built. `InvoiceLine.IsBilled`-style "billed?" column on the Trip **list** was d
 
 | Date | Module | Commit | Notes |
 |---|---|---|---|
+| 2026-09-05 | Spare Parts Inventory (module 7) | _pending_ | Migration 013: `dbo.Parts` + `dbo.StockMovements`; `WorkOrderItems` gained `PartId` (FK, SET NULL) + `StockMovementId` (soft link). `Part`/`StockMovement` models, `PartMapper` (on-hand/stock-value/below-reorder derived), `PartsController` (`api/parts` CRUD + `movements` + `low-stock`). `WorkOrderItemsController` now syncs an Issue `StockMovement` with a part-linked line on create/update/delete. `Pages/Inventory/PartList.razor` + `PartEditor.razor` (tabbed) + `GoodsReceipt.razor`; `WorkOrderEditor.razor` gained a stocked-part picker; sidebar + Home dashboard section. **Two bugs found and fixed during verification:** (1) `WorkOrdersController.Delete` didn't clean up a deleted work order's issued `StockMovement`s, orphaning them and leaving on-hand permanently decremented -- fixed by deleting them explicitly first. (2) `WorkOrdersController` `GetAll`/`GetById` were missing `.ThenInclude(i => i.Part)`, so `WorkOrderItemDto.PartNumber` rendered as "—" even when a line was linked -- fixed. Verified via API (full CRUD, Receipt/Issue/Adjust math, part-link auto-issue/sync/restore, delete guards, both bugs confirmed present then fixed) and browser (part create → receipt → work-order part-linked line → goods receipt, no console errors). Dev DB clean. **Module 7 complete.**
 | 2026-09-05 | Tyre Management (module 6) | `e086c9b` | Migration 012: `dbo.Tyres.VehicleId` nullable (`ON DELETE SET NULL`) + new columns (`SerialNumber`/`Pattern`/`PurchaseDate`/`PurchaseCost`/`Status`/`TotalDistanceRunCarried`/`CreatedAt`/`UpdatedAt`), new `dbo.TyreEvents`. `TyreEvent` model, `TyreStatus`/`TyreEventType` enums, `TyreMapper`, `TyresController` (`api/tyres` CRUD + `stock` + `{id}/events`). `VehiclesController.Delete` now unassigns fitted tyres to stock (carrying distance, logging a Remove event) before the vehicle cascade. `VehicleTyresController.Create` seeds a matching Fit event; nested tab otherwise untouched. `FleetApiClient` methods (`*TyreRecord*`/`*TyreEvent*`, distinct from the existing nested `*Tyre*` methods). `Pages/Tyres/TyreList.razor` + `TyreEditor.razor` (tabbed Details/Events); sidebar + Home dashboard section + quick-link. Verified via API (full Fit→Rotate→Remove→Retread→re-Fit→Scrap lifecycle, distance/cost-per-km math, all invalid-transition 400s, vehicle-delete cascade) and browser (create → fit event → list → delete, no console errors). Dev DB clean — note: cascade testing deleted then recreated the pre-existing placeholder vehicle `VEH-00004` (now `VEH-00005`, same reg/make/model). **Module 6 complete.**
 | 2026-09-05 | Compliance alert config + delivery (module 5 completion) | `b13e871` | Migration 011: `dbo.AlertConfigs` + `dbo.AlertLog` (unique dedupe index on entity/document/expiry/severity). `AlertConfig` / `AlertLog` models, `AlertConfigMapper`, `AlertConfigsController` (`api/compliance/config` CRUD), `ComplianceController` gained `document-types` / `alert-log` / `run-alerts`. `IEmailSender` + `SmtpEmailSender` (System.Net.Mail, no-op-with-warning when `Smtp:Host` unset) + `ComplianceAlertService` (shared scan/match/send logic) + `ComplianceAlertHostedService` (24h timer, configurable via `Compliance:AlertScanIntervalHours`). `FleetApiClient` methods; `Pages/Compliance/AlertSettings.razor` (add/deactivate/delete rules, Run Now, recent activity); sidebar sub-link. Verified via API (CRUD, 7 expired items scanned, 0 sent without SMTP configured, inactive-config skip) and browser (add rule → Run Now → deactivate → delete, no console errors, existing Compliance dashboard unaffected). Dev DB clean. **Module 5 complete.**
 | 2026-09-01 | Roadmap created | — | This document. |

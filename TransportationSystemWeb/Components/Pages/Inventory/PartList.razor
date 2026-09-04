@@ -1,0 +1,144 @@
+@page "/parts"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Spare Parts Inventory</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Spare Parts Inventory</h2>
+        <div class="text-muted small">Inventory &rsaquo; Parts</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary" href="/parts/goods-receipt"><i class="bi bi-box-arrow-in-down me-1"></i>Goods Receipt</a>
+        <a class="btn btn-primary" href="/parts/new"><i class="bi bi-plus-lg me-1"></i>Add Part</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Total Parts</div>
+            <div class="stat-value">@(_parts?.Count ?? 0)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Below Reorder</div>
+            <div class="stat-value text-danger">@(_parts?.Count(p => p.BelowReorder) ?? 0)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Stock Value</div>
+            <div class="stat-value">@((_parts?.Sum(p => p.StockValue) ?? 0).ToString("N0"))</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-9">
+            <input class="form-control" placeholder="Search part number, name..."
+                   @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+        </div>
+        <div class="col-md-3 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="Load">
+                <i class="bi bi-funnel me-1"></i>Apply
+            </button>
+        </div>
+    </div>
+</div></div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_parts is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_parts.Count == 0)
+{
+    <div class="alert alert-info">No parts found. Click "Add Part" to create the first one.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Part #</th><th>Name</th><th>Unit</th><th class="text-end">On Hand</th>
+                    <th class="text-end">Reorder Level</th><th class="text-end">Std. Cost</th>
+                    <th class="text-end">Stock Value</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in _parts)
+                {
+                    <tr class="@(p.BelowReorder ? "table-danger" : "")">
+                        <td class="font-monospace">@p.PartNumber</td>
+                        <td>@p.Name</td>
+                        <td>@p.Unit</td>
+                        <td class="text-end">@p.OnHandQty.ToString("0.##") @(p.BelowReorder ? "⚠" : "")</td>
+                        <td class="text-end">@p.ReorderLevel.ToString("0.##")</td>
+                        <td class="text-end">@(p.StandardCost?.ToString("N2") ?? "—")</td>
+                        <td class="text-end">@p.StockValue.ToString("N2")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/parts/@p.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(p.Id)" title="Delete part">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<PartListItemDto>? _parts;
+    private string _search = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            _parts = await Api.GetPartsAsync(_search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load parts: {ex.Message}";
+            _parts = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "Delete this part and its stock movement history? This cannot be undone.");
+        if (!confirmed) return;
+
+        try
+        {
+            await Api.DeletePartAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete part: {ex.Message}";
+        }
+    }
+}

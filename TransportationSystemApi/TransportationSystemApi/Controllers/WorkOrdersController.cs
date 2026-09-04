@@ -27,7 +27,7 @@ public class WorkOrdersController : ControllerBase
     {
         var query = _db.WorkOrders.AsNoTracking()
             .Include(w => w.Vehicle)
-            .Include(w => w.Items)
+            .Include(w => w.Items).ThenInclude(i => i.Part)
             .AsQueryable();
 
         if (vehicleId.HasValue)
@@ -100,6 +100,18 @@ public class WorkOrdersController : ControllerBase
         var workOrder = await _db.WorkOrders.FindAsync(id);
         if (workOrder is null) return NotFound();
 
+        // WorkOrderItems cascades at the DB level, but any StockMovement an
+        // item issued does not -- delete those explicitly first so on-hand
+        // qty is restored instead of the movement being orphaned.
+        var stockMovementIds = await _db.WorkOrderItems
+            .Where(i => i.WorkOrderId == id && i.StockMovementId != null)
+            .Select(i => i.StockMovementId!.Value)
+            .ToListAsync();
+        if (stockMovementIds.Count > 0)
+        {
+            await _db.StockMovements.Where(m => stockMovementIds.Contains(m.Id)).ExecuteDeleteAsync();
+        }
+
         _db.WorkOrders.Remove(workOrder);
         await _db.SaveChangesAsync();
         return NoContent();
@@ -119,7 +131,7 @@ public class WorkOrdersController : ControllerBase
     {
         return await _db.WorkOrders
             .Include(w => w.Vehicle)
-            .Include(w => w.Items)
+            .Include(w => w.Items).ThenInclude(i => i.Part)
             .AsSplitQuery()
             .FirstOrDefaultAsync(w => w.Id == id);
     }

@@ -74,7 +74,9 @@ public static class WorkOrderMapper
         Description = i.Description,
         Quantity = i.Quantity,
         UnitCost = i.UnitCost,
-        LineTotal = i.Quantity * i.UnitCost
+        LineTotal = i.Quantity * i.UnitCost,
+        PartId = i.PartId,
+        PartNumber = i.Part?.PartNumber
     };
 
     public static void ApplyUpsert(WorkOrderItem i, WorkOrderItemUpsertDto dto)

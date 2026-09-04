@@ -670,6 +670,66 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Spare Parts Inventory (module 7) -----
+
+    public async Task<List<PartListItemDto>> GetPartsAsync(string? search = null)
+    {
+        await AuthorizeAsync();
+        var qs = string.IsNullOrWhiteSpace(search) ? "" : $"?search={Uri.EscapeDataString(search)}";
+        return await _http.GetFromJsonAsync<List<PartListItemDto>>($"api/parts{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<List<PartListItemDto>> GetLowStockPartsAsync()
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<List<PartListItemDto>>("api/parts/low-stock", JsonOptions) ?? new();
+    }
+
+    public async Task<PartDetailDto?> GetPartAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/parts/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<PartDetailDto>(JsonOptions);
+    }
+
+    public async Task<PartDetailDto> CreatePartAsync(PartUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/parts", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<PartDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdatePartAsync(int id, PartUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/parts/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeletePartAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/parts/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<StockMovementDto> AddStockMovementAsync(int partId, StockMovementUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/parts/{partId}/movements", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<StockMovementDto>(JsonOptions))!;
+    }
+
+    public async Task DeleteStockMovementAsync(int partId, int movementId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/parts/{partId}/movements/{movementId}");
+        await EnsureSuccess(response);
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

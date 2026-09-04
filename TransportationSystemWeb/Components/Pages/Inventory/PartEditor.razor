@@ -1,0 +1,324 @@
+@page "/parts/new"
+@page "/parts/{Id:int}/edit"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>@(IsNew ? "Add Part" : "Edit Part") - Spare Parts Inventory</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">
+            @if (IsNew)
+            {
+                <text>Add Part</text>
+            }
+            else
+            {
+                <span class="font-monospace">@_detail?.PartNumber</span> <text> &mdash; @_model.Name</text>
+                @if (_detail is { BelowReorder: true })
+                {
+                    <span class="badge bg-danger ms-2">Below Reorder</span>
+                }
+            }
+        </h2>
+        <div class="text-muted small">Inventory &rsaquo; Parts</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="/parts"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+@if (_message is not null)
+{
+    <div class="alert alert-success">@_message</div>
+}
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    @if (!IsNew && _detail is not null)
+    {
+        <ul class="nav nav-tabs mb-3">
+            @foreach (var tab in Tabs)
+            {
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(_activeTab == tab ? "active" : "")" @onclick="() => _activeTab = tab">@tab</button>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (_activeTab == "Details")
+    {
+        <EditForm Model="_model" OnValidSubmit="Save">
+            <DataAnnotationsValidator />
+
+            @if (!IsNew && _detail is not null)
+            {
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="stat-label">On Hand</div>
+                            <div class="fw-semibold">@_detail.OnHandQty.ToString("0.##") @_detail.Unit</div>
+                        </div></div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="stat-label">Stock Value</div>
+                            <div class="fw-semibold">@_detail.StockValue.ToString("N2")</div>
+                        </div></div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="stat-label">Reorder Level</div>
+                            <div class="fw-semibold">@_detail.ReorderLevel.ToString("0.##")</div>
+                        </div></div>
+                    </div>
+                </div>
+            }
+
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Part Details</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Part Number *</label>
+                        <InputText class="form-control" @bind-Value="_model.PartNumber" />
+                        <ValidationMessage For="() => _model.PartNumber" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Name *</label>
+                        <InputText class="form-control" @bind-Value="_model.Name" />
+                        <ValidationMessage For="() => _model.Name" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Unit *</label>
+                        <InputText class="form-control" @bind-Value="_model.Unit" placeholder="pcs / L / kg" />
+                        <ValidationMessage For="() => _model.Unit" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Reorder Level</label>
+                        <InputNumber class="form-control" @bind-Value="_model.ReorderLevel" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Standard Cost</label>
+                        <InputNumber class="form-control" @bind-Value="_model.StandardCost" />
+                        <ValidationMessage For="() => _model.StandardCost" />
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Notes</label>
+                        <InputTextArea class="form-control" rows="2" @bind-Value="_model.Notes" />
+                    </div>
+                </div>
+            </div></div>
+
+            <div class="mt-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@(IsNew ? "Create Part" : "Save Changes")</button>
+                <a class="btn btn-outline-secondary" href="/parts">Cancel</a>
+            </div>
+        </EditForm>
+    }
+    else if (_activeTab == "Stock Movements" && _detail is not null)
+    {
+        <div class="card"><div class="card-body">
+            <h5 class="card-title">Stock Movements</h5>
+            <div class="text-muted small mb-3">Manual receipts, issues, and adjustments. Movements created by issuing a work order line are shown here too, but are edited from that work order.</div>
+
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-2">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" @bind="_newMovement.MovementType">
+                        @foreach (var t in Enum.GetValues<PartMovementType>())
+                        {
+                            <option value="@t">@t.ToDisplayName()</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Date</label>
+                    <input type="date" class="form-control" @bind="_newMovement.Date" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" step="0.01" class="form-control" @bind="_newMovement.Quantity" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Unit Cost</label>
+                    <input type="number" step="0.01" class="form-control" @bind="_newMovement.UnitCost" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Supplier</label>
+                    <input class="form-control" @bind="_newMovement.SupplierName" />
+                </div>
+                <div class="col-md-1 d-grid">
+                    <button type="button" class="btn btn-primary" @onclick="AddMovement"><i class="bi bi-plus-lg"></i></button>
+                </div>
+            </div>
+
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Date</th><th>Type</th><th class="text-end">Qty</th><th class="text-end">Unit Cost</th><th>Reference</th><th>Notes</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var m in _detail.Movements)
+                {
+                    <tr>
+                        <td>@m.Date.ToString("dd-MMM-yyyy")</td>
+                        <td>@m.MovementType.ToDisplayName()</td>
+                        <td class="text-end">@m.Quantity.ToString("0.##")</td>
+                        <td class="text-end">@(m.UnitCost?.ToString("N2") ?? "—")</td>
+                        <td>@(m.ReferenceType == StockMovementReferenceType.WorkOrder ? $"Work Order #{m.ReferenceId}" : (m.SupplierName ?? "—"))</td>
+                        <td>@(string.IsNullOrWhiteSpace(m.Notes) ? "—" : m.Notes)</td>
+                        <td class="text-end">
+                            @if (m.ReferenceType == StockMovementReferenceType.Manual)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteMovement(m.Id)"><i class="bi bi-trash"></i></button>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (_detail.Movements.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-muted small">No movements recorded yet.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div></div>
+    }
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool IsNew => Id is null;
+    private static readonly string[] Tabs = { "Details", "Stock Movements" };
+    private string _activeTab = "Details";
+
+    private bool _loading = true;
+    private string? _error;
+    private string? _message;
+
+    private PartUpsertDto _model = new();
+    private PartDetailDto? _detail;
+
+    private StockMovementUpsertDto _newMovement = NewMovement();
+
+    private static StockMovementUpsertDto NewMovement() => new() { Date = DateOnly.FromDateTime(DateTime.Today) };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _activeTab = "Details";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            if (Id.HasValue)
+            {
+                _detail = await Api.GetPartAsync(Id.Value);
+                if (_detail is null)
+                {
+                    _error = "Part not found.";
+                }
+                else
+                {
+                    _model = new PartUpsertDto
+                    {
+                        PartNumber = _detail.PartNumber,
+                        Name = _detail.Name,
+                        Unit = _detail.Unit,
+                        ReorderLevel = _detail.ReorderLevel,
+                        StandardCost = _detail.StandardCost,
+                        Notes = _detail.Notes
+                    };
+                }
+            }
+            else
+            {
+                _detail = null;
+                _model = new PartUpsertDto();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load part: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        _error = null;
+        _message = null;
+
+        try
+        {
+            if (IsNew)
+            {
+                var created = await Api.CreatePartAsync(_model);
+                Nav.NavigateTo($"/parts/{created.Id}/edit");
+            }
+            else
+            {
+                await Api.UpdatePartAsync(Id!.Value, _model);
+                _message = "Changes saved.";
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save part: {ex.Message}";
+        }
+    }
+
+    private async Task AddMovement()
+    {
+        _error = null;
+        if (Id is null) return;
+        if (_newMovement.Quantity == 0)
+        {
+            _error = "Enter a non-zero quantity.";
+            return;
+        }
+
+        try
+        {
+            await Api.AddStockMovementAsync(Id.Value, _newMovement);
+            _newMovement = NewMovement();
+            _detail = await Api.GetPartAsync(Id.Value);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add movement: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteMovement(int movementId)
+    {
+        _error = null;
+        if (Id is null) return;
+
+        try
+        {
+            await Api.DeleteStockMovementAsync(Id.Value, movementId);
+            _detail = await Api.GetPartAsync(Id.Value);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete movement: {ex.Message}";
+        }
+    }
+}

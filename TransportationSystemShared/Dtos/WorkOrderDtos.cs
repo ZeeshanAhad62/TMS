@@ -65,6 +65,10 @@ public class WorkOrderItemDto
     public decimal Quantity { get; set; }
     public decimal UnitCost { get; set; }
     public decimal LineTotal { get; set; }
+
+    // Set when this line issues against a stocked Part (see PartDtos.cs).
+    public int? PartId { get; set; }
+    public string? PartNumber { get; set; }
 }
 
 public class WorkOrderItemUpsertDto
@@ -77,4 +81,6 @@ public class WorkOrderItemUpsertDto
 
     [Range(0, double.MaxValue)]
     public decimal UnitCost { get; set; }
+
+    public int? PartId { get; set; }
 }

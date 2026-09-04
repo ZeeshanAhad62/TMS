@@ -19,6 +19,7 @@
         <a class="btn btn-outline-primary btn-sm" href="/invoices"><i class="bi bi-receipt me-1"></i>Invoices</a>
         <a class="btn btn-outline-primary btn-sm" href="/workorders"><i class="bi bi-tools me-1"></i>Work Orders</a>
         <a class="btn btn-outline-primary btn-sm" href="/tyres"><i class="bi bi-circle me-1"></i>Tyres</a>
+        <a class="btn btn-outline-primary btn-sm" href="/parts"><i class="bi bi-box-seam me-1"></i>Parts</a>
     </div>
 </div>
 
@@ -621,6 +622,78 @@ else
         </div>
     </div>
 
+    @if (_parts is not null)
+    {
+        <div class="row g-3 mt-1">
+            <div class="col-lg-8">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Total Parts</div>
+                                    <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-box-seam"></i></div>
+                                </div>
+                                <div class="stat-value">@_parts.Count</div>
+                                <div class="stat-sub text-muted">In the part master</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Below Reorder</div>
+                                    <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-exclamation-triangle"></i></div>
+                                </div>
+                                <div class="stat-value text-danger">@PartsBelowReorderCount</div>
+                                <div class="stat-sub text-muted">Need restocking</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Stock Value</div>
+                                    <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-cash-stack"></i></div>
+                                </div>
+                                <div class="stat-value">@TotalStockValue.ToString("N0")</div>
+                                <div class="stat-sub text-muted">On hand, at standard cost</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h6 class="mb-3">Parts to Reorder</h6>
+                        @if (!PartsBelowReorder.Any())
+                        {
+                            <div class="text-muted small">Everything is above its reorder level.</div>
+                        }
+                        else
+                        {
+                            @foreach (var p in PartsBelowReorder)
+                            {
+                                <div class="side-list-row">
+                                    <div class="side-list-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-box-seam"></i></div>
+                                    <div class="flex-grow-1 text-truncate">
+                                        <div class="font-monospace small">@p.PartNumber</div>
+                                        <div class="text-muted" style="font-size:0.75rem;">@p.Name</div>
+                                    </div>
+                                    <span class="badge bg-danger">@p.OnHandQty.ToString("0.##") / @p.ReorderLevel.ToString("0.##")</span>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
     @if (_tyres is not null)
     {
         <div class="row g-3 mt-1">
@@ -704,6 +777,7 @@ else
     private InvoiceAgingDto? _aging;
     private ComplianceSummaryDto? _compliance;
     private List<TyreListItemDto>? _tyres;
+    private List<PartListItemDto>? _parts;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -721,6 +795,7 @@ else
             _aging = await Api.GetInvoiceAgingAsync();
             _compliance = await Api.GetComplianceSummaryAsync(30);
             _tyres = await Api.GetTyresAsync();
+            _parts = await Api.GetPartsAsync();
         }
         catch (Exception ex)
         {
@@ -787,6 +862,10 @@ else
             .OrderByDescending(c => c.Id)
             .Take(5)
             .ToList();
+
+    private int PartsBelowReorderCount => _parts?.Count(p => p.BelowReorder) ?? 0;
+    private decimal TotalStockValue => (_parts ?? new()).Sum(p => p.StockValue);
+    private List<PartListItemDto> PartsBelowReorder => (_parts ?? new()).Where(p => p.BelowReorder).Take(5).ToList();
 
     private int TyresInStockCount => _tyres?.Count(t => t.Status == TyreStatus.InStock) ?? 0;
     private int TyresFittedCount => _tyres?.Count(t => t.Status == TyreStatus.Fitted) ?? 0;

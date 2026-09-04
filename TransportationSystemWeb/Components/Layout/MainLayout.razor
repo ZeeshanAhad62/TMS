@@ -107,6 +107,18 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @(SubLinkClass("/parts") == "active" ? "active-module" : "")" title="Spare Parts Inventory">
+                    <i class="bi bi-box-seam"></i> <span class="nav-text">Spare Parts Inventory</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/parts")" href="/parts" title="Parts">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Parts</span>
+                </a>
+                <a class="nav-sublink @SubLinkClass("/parts/goods-receipt")" href="/parts/goods-receipt" title="Goods Receipt">
+                    <i class="bi bi-box-arrow-in-down"></i> <span class="nav-text">Goods Receipt</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/compliance") == "active" ? "active-module" : "")" title="Compliance">
                     <i class="bi bi-shield-check"></i> <span class="nav-text">Compliance</span>
                 </div>

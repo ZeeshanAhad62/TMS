@@ -33,6 +33,8 @@ public class FleetDbContext : DbContext
     public DbSet<AlertConfig> AlertConfigs => Set<AlertConfig>();
     public DbSet<AlertLog> AlertLog => Set<AlertLog>();
     public DbSet<TyreEvent> TyreEvents => Set<TyreEvent>();
+    public DbSet<Part> Parts => Set<Part>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -233,6 +235,29 @@ public class FleetDbContext : DbContext
         {
             entity.Property(i => i.Quantity).HasPrecision(18, 2);
             entity.Property(i => i.UnitCost).HasPrecision(18, 2);
+
+            entity.HasOne(i => i.Part)
+                .WithMany()
+                .HasForeignKey(i => i.PartId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Part>(entity =>
+        {
+            entity.HasIndex(p => p.PartNumber).IsUnique();
+            entity.Property(p => p.ReorderLevel).HasPrecision(18, 2);
+            entity.Property(p => p.StandardCost).HasPrecision(18, 2);
+
+            entity.HasMany(p => p.Movements)
+                .WithOne(m => m.Part)
+                .HasForeignKey(m => m.PartId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<StockMovement>(entity =>
+        {
+            entity.Property(m => m.Quantity).HasPrecision(18, 2);
+            entity.Property(m => m.UnitCost).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<Customer>(entity =>
