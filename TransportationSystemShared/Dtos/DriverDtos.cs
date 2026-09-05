@@ -13,6 +13,7 @@ public class DriverListItemDto
     public DriverStatus Status { get; set; }
     public DateOnly? LicenseExpiryDate { get; set; }
     public bool HasExpiringDocument { get; set; }
+    public decimal AdvancesOutstanding { get; set; }
 }
 
 public class DriverDetailDto : DriverUpsertDto
@@ -22,8 +23,12 @@ public class DriverDetailDto : DriverUpsertDto
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
+    // Advances still owed across all pay runs (Σ Amount - Σ RecoveredAmount).
+    public decimal AdvancesOutstanding { get; set; }
+
     public List<DriverDocumentDto> Documents { get; set; } = new();
     public List<DriverVehicleAssignmentDto> Assignments { get; set; } = new();
+    public List<DriverAdvanceDto> Advances { get; set; } = new();
 }
 
 public class DriverUpsertDto
@@ -45,6 +50,14 @@ public class DriverUpsertDto
     public DateOnly? LicenseExpiryDate { get; set; }
 
     public DriverStatus Status { get; set; } = DriverStatus.Active;
+
+    // Pay configuration (Payroll module). PayRate is read per PayType:
+    // PerTrip = per completed trip, PerKm = per km, Monthly = flat for the
+    // period, Percentage = percent of trip revenue.
+    public DriverPayType PayType { get; set; } = DriverPayType.PerTrip;
+
+    [Range(0, 999999999)]
+    public decimal? PayRate { get; set; }
 }
 
 public class DriverDocumentDto

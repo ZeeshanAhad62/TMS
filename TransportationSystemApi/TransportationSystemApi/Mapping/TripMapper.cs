@@ -22,11 +22,12 @@ public static class TripMapper
 
     public static decimal ExpensesTotal(Trip t) => t.Expenses.Sum(e => e.Amount);
 
-    public static TripDetailDto ToDetailDto(Trip t, decimal fuelCost)
+    public static TripDetailDto ToDetailDto(Trip t, decimal fuelCost, decimal driverPay = 0m)
     {
         var revenue = t.Revenue ?? 0m;
         var expenses = ExpensesTotal(t);
-        const decimal driverPay = 0m; // filled in once the Payroll module exists
+        // driverPay = Σ settled pay-run line amounts tagged to this trip
+        // (Payroll module). 0 until a pay run covering the trip exists.
 
         return new TripDetailDto
         {

@@ -1,0 +1,430 @@
+@page "/payruns/new"
+@page "/payruns/{Id:int}/edit"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>@(IsNew ? "New Pay Run" : "Edit Pay Run") - Driver Payroll</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">
+            @if (IsNew)
+            {
+                <text>New Pay Run</text>
+            }
+            else
+            {
+                <span class="font-monospace">@_detail?.PayRunCode</span>
+                <text> &mdash; @_detail?.DriverName</text>
+                @if (_detail is not null)
+                {
+                    <span class="badge @StatusClass(_detail.Status) ms-2">@_detail.Status.ToDisplayName()</span>
+                }
+            }
+        </h2>
+        <div class="text-muted small">Payroll &rsaquo; Pay Runs</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="/payruns"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+@if (_message is not null)
+{
+    <div class="alert alert-success">@_message</div>
+}
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    @if (!IsNew && _detail is not null)
+    {
+        <ul class="nav nav-tabs mb-3">
+            @foreach (var tab in Tabs)
+            {
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(_activeTab == tab ? "active" : "")" @onclick="() => _activeTab = tab">@tab</button>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (_activeTab == "Details")
+    {
+        @if (!IsNew && _detail is not null)
+        {
+            <div class="row g-3 mb-3">
+                <div class="col-6 col-md-3">
+                    <div class="card stat-card h-100"><div class="card-body">
+                        <div class="stat-label">Lines Total</div>
+                        <div class="fw-semibold">@_detail.LinesTotal.ToString("N2")</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card stat-card h-100"><div class="card-body">
+                        <div class="stat-label">Gross Pay</div>
+                        <div class="fw-semibold">@_detail.GrossPay.ToString("N2")</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card stat-card h-100"><div class="card-body">
+                        <div class="stat-label">Net Pay</div>
+                        <div class="fw-semibold">@_detail.NetPay.ToString("N2")</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card stat-card h-100"><div class="card-body">
+                        <div class="stat-label">Advances Outstanding</div>
+                        <div class="fw-semibold @(_detail.AdvancesOutstanding > 0 ? "text-danger" : "")">@_detail.AdvancesOutstanding.ToString("N2")</div>
+                    </div></div>
+                </div>
+            </div>
+        }
+
+        <EditForm Model="_model" OnValidSubmit="Save">
+            <DataAnnotationsValidator />
+
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Pay Run Details</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Driver *</label>
+                        <InputSelect class="form-select" @bind-Value="_model.DriverId" disabled="@(!IsNew)">
+                            <option value="0">Select a driver...</option>
+                            @if (_drivers is not null)
+                            {
+                                @foreach (var d in _drivers)
+                                {
+                                    <option value="@d.Id">@d.DriverCode &mdash; @d.FullName</option>
+                                }
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="() => _model.DriverId" />
+                        @if (!IsNew)
+                        {
+                            <div class="form-text">Driver is fixed once the pay run exists.</div>
+                        }
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <InputSelect class="form-select" @bind-Value="_model.Status">
+                            @foreach (var s in Enum.GetValues<PayRunStatus>())
+                            {
+                                <option value="@s">@s.ToDisplayName()</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Period Start *</label>
+                        <InputDate class="form-control" @bind-Value="_model.PeriodStart" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Period End *</label>
+                        <InputDate class="form-control" @bind-Value="_model.PeriodEnd" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Allowances</label>
+                        <InputNumber class="form-control" @bind-Value="_model.AllowancesTotal" />
+                        <div class="form-text">Added to gross pay.</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Advance Recovery</label>
+                        <InputNumber class="form-control" @bind-Value="_model.AdvanceRecovery" />
+                        <div class="form-text">
+                            Subtracted from gross.
+                            @if (!IsNew && _detail is not null && _detail.AdvancesOutstanding > 0)
+                            {
+                                <button type="button" class="btn btn-link btn-sm p-0 align-baseline"
+                                        @onclick="() => _model.AdvanceRecovery = Math.Min(_detail!.AdvancesOutstanding, _detail!.GrossPay)">
+                                    recover @Math.Min(_detail.AdvancesOutstanding, _detail.GrossPay).ToString("N0")
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Notes</label>
+                        <InputText class="form-control" @bind-Value="_model.Notes" />
+                    </div>
+                </div>
+            </div></div>
+
+            <div class="mt-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@(IsNew ? "Create Pay Run" : "Save Changes")</button>
+                <a class="btn btn-outline-secondary" href="/payruns">Cancel</a>
+            </div>
+        </EditForm>
+    }
+    else if (_activeTab == "Lines" && _detail is not null)
+    {
+        <div class="card"><div class="card-body">
+            <h5 class="card-title">Pay Lines</h5>
+            <div class="text-muted small mb-3">Each line adds to gross pay. A line may be tied to a trip; that amount then shows on the trip's P&amp;L.</div>
+
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-3">
+                    <label class="form-label">Description</label>
+                    <input class="form-control" @bind="_newLine.Description" placeholder="Trip pay / bonus / deduction" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Trip</label>
+                    <select class="form-select" @bind="_newLineTripId">
+                        <option value="">None</option>
+                        @foreach (var t in _driverTrips)
+                        {
+                            <option value="@t.Id">@t.TripCode</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Basis</label>
+                    <select class="form-select" @bind="_newLine.Basis">
+                        @foreach (var b in Enum.GetValues<PayRunLineBasis>())
+                        {
+                            <option value="@b">@b.ToDisplayName()</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">Qty</label>
+                    <input type="number" step="0.01" class="form-control" @bind="_newLine.Quantity" />
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">Rate</label>
+                    <input type="number" step="0.01" class="form-control" @bind="_newLine.Rate" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Amount</label>
+                    <input type="number" step="0.01" class="form-control" @bind="_newLine.Amount" />
+                </div>
+                <div class="col-md-1 d-grid">
+                    <button type="button" class="btn btn-primary" @onclick="AddLine"><i class="bi bi-plus-lg"></i></button>
+                </div>
+            </div>
+
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Description</th><th>Trip</th><th>Basis</th><th class="text-end">Qty</th><th class="text-end">Rate</th><th class="text-end">Amount</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var l in _detail.Lines)
+                {
+                    var edit = _lineEdits[l.Id];
+                    <tr>
+                        <td><input class="form-control form-control-sm" @bind="edit.Description" /></td>
+                        <td class="font-monospace small">@(l.TripCode ?? "—")</td>
+                        <td>
+                            <select class="form-select form-select-sm" @bind="edit.Basis">
+                                @foreach (var b in Enum.GetValues<PayRunLineBasis>())
+                                {
+                                    <option value="@b">@b.ToDisplayName()</option>
+                                }
+                            </select>
+                        </td>
+                        <td class="text-end" style="max-width:90px"><input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="edit.Quantity" /></td>
+                        <td class="text-end" style="max-width:90px"><input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="edit.Rate" /></td>
+                        <td class="text-end" style="max-width:110px"><input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="edit.Amount" /></td>
+                        <td class="text-end text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveLine(l.Id)" title="Save line"><i class="bi bi-check-lg"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteLine(l.Id)" title="Delete line"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+                @if (_detail.Lines.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-muted small">No lines yet.</td></tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="5" class="text-end">Lines total</th><th class="text-end">@_detail.LinesTotal.ToString("N2")</th><th></th></tr>
+                    <tr><th colspan="5" class="text-end">+ Allowances</th><th class="text-end">@_detail.AllowancesTotal.ToString("N2")</th><th></th></tr>
+                    <tr><th colspan="5" class="text-end">Gross pay</th><th class="text-end">@_detail.GrossPay.ToString("N2")</th><th></th></tr>
+                    <tr><th colspan="5" class="text-end">&minus; Advance recovery</th><th class="text-end">@_detail.AdvanceRecovery.ToString("N2")</th><th></th></tr>
+                    <tr><th colspan="5" class="text-end">Net pay</th><th class="text-end fw-bold">@_detail.NetPay.ToString("N2")</th><th></th></tr>
+                </tfoot>
+            </table>
+        </div></div>
+    }
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool IsNew => Id is null;
+    private static readonly string[] Tabs = { "Details", "Lines" };
+    private string _activeTab = "Details";
+
+    private bool _loading = true;
+    private string? _error;
+    private string? _message;
+
+    private PayRunUpsertDto _model = NewModel();
+    private PayRunDetailDto? _detail;
+    private List<DriverListItemDto>? _drivers;
+    private List<TripListItemDto> _driverTrips = new();
+
+    private PayRunLineUpsertDto _newLine = new() { Quantity = 1 };
+    private string _newLineTripId = "";
+    private Dictionary<int, PayRunLineUpsertDto> _lineEdits = new();
+
+    private static PayRunUpsertDto NewModel() => new()
+    {
+        PeriodStart = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1),
+        PeriodEnd = DateOnly.FromDateTime(DateTime.Today)
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _activeTab = "Details";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _drivers ??= await Api.GetDriversAsync();
+
+            if (Id.HasValue)
+            {
+                _detail = await Api.GetPayRunAsync(Id.Value);
+                if (_detail is null)
+                {
+                    _error = "Pay run not found.";
+                }
+                else
+                {
+                    _model = new PayRunUpsertDto
+                    {
+                        DriverId = _detail.DriverId,
+                        PeriodStart = _detail.PeriodStart,
+                        PeriodEnd = _detail.PeriodEnd,
+                        Status = _detail.Status,
+                        AllowancesTotal = _detail.AllowancesTotal,
+                        AdvanceRecovery = _detail.AdvanceRecovery,
+                        Notes = _detail.Notes
+                    };
+                    _lineEdits = _detail.Lines.ToDictionary(l => l.Id, l => new PayRunLineUpsertDto
+                    {
+                        TripId = l.TripId,
+                        Description = l.Description,
+                        Basis = l.Basis,
+                        Quantity = l.Quantity,
+                        Rate = l.Rate,
+                        Amount = l.Amount
+                    });
+                    _driverTrips = await Api.GetTripsAsync(driverId: _detail.DriverId);
+                }
+            }
+            else
+            {
+                _detail = null;
+                _model = NewModel();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load pay run: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        _error = null;
+        _message = null;
+        try
+        {
+            if (IsNew)
+            {
+                var created = await Api.CreatePayRunAsync(_model);
+                Nav.NavigateTo($"/payruns/{created.Id}/edit");
+            }
+            else
+            {
+                await Api.UpdatePayRunAsync(Id!.Value, _model);
+                _message = "Changes saved.";
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save pay run: {ex.Message}";
+        }
+    }
+
+    private async Task AddLine()
+    {
+        _error = null;
+        if (_detail is null) return;
+        if (string.IsNullOrWhiteSpace(_newLine.Description))
+        {
+            _error = "Enter a line description.";
+            return;
+        }
+        _newLine.TripId = int.TryParse(_newLineTripId, out var t) ? t : null;
+        try
+        {
+            await Api.CreatePayRunLineAsync(_detail.Id, _newLine);
+            _newLine = new() { Quantity = 1 };
+            _newLineTripId = "";
+            _activeTab = "Lines";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add line: {ex.Message}";
+        }
+    }
+
+    private async Task SaveLine(int lineId)
+    {
+        _error = null;
+        if (_detail is null) return;
+        try
+        {
+            await Api.UpdatePayRunLineAsync(_detail.Id, lineId, _lineEdits[lineId]);
+            _activeTab = "Lines";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save line: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteLine(int lineId)
+    {
+        _error = null;
+        if (_detail is null) return;
+        try
+        {
+            await Api.DeletePayRunLineAsync(_detail.Id, lineId);
+            _activeTab = "Lines";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete line: {ex.Message}";
+        }
+    }
+
+    private static string StatusClass(PayRunStatus s) => s switch
+    {
+        PayRunStatus.Draft => "bg-warning text-dark",
+        PayRunStatus.Approved => "bg-info text-dark",
+        PayRunStatus.Paid => "bg-success",
+        PayRunStatus.Cancelled => "bg-secondary",
+        _ => "bg-light text-dark"
+    };
+}

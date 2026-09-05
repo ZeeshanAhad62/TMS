@@ -20,6 +20,7 @@
         <a class="btn btn-outline-primary btn-sm" href="/workorders"><i class="bi bi-tools me-1"></i>Work Orders</a>
         <a class="btn btn-outline-primary btn-sm" href="/tyres"><i class="bi bi-circle me-1"></i>Tyres</a>
         <a class="btn btn-outline-primary btn-sm" href="/parts"><i class="bi bi-box-seam me-1"></i>Parts</a>
+        <a class="btn btn-outline-primary btn-sm" href="/payruns"><i class="bi bi-cash-coin me-1"></i>Payroll</a>
     </div>
 </div>
 
@@ -765,6 +766,78 @@ else
             </div>
         </div>
     }
+
+    @if (_payRuns is not null)
+    {
+        <div class="row g-3 mt-1">
+            <div class="col-lg-8">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Draft Pay Runs</div>
+                                    <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-hourglass-split"></i></div>
+                                </div>
+                                <div class="stat-value">@DraftPayRunCount</div>
+                                <div class="stat-sub text-muted">Awaiting approval</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Net Pay This Month</div>
+                                    <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-cash-coin"></i></div>
+                                </div>
+                                <div class="stat-value">@NetPayThisMonth.ToString("N0")</div>
+                                <div class="stat-sub text-muted">Pay runs ending this month</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Advances Outstanding</div>
+                                    <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-wallet2"></i></div>
+                                </div>
+                                <div class="stat-value @(AdvancesOutstanding > 0 ? "text-danger" : "")">@AdvancesOutstanding.ToString("N0")</div>
+                                <div class="stat-sub text-muted">Across all drivers</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h6 class="mb-3">Recent Pay Runs</h6>
+                        @if (!RecentPayRuns.Any())
+                        {
+                            <div class="text-muted small">No pay runs yet.</div>
+                        }
+                        else
+                        {
+                            @foreach (var r in RecentPayRuns)
+                            {
+                                <div class="side-list-row">
+                                    <div class="side-list-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-cash-coin"></i></div>
+                                    <div class="flex-grow-1 text-truncate">
+                                        <div class="font-monospace small">@r.PayRunCode</div>
+                                        <div class="text-muted" style="font-size:0.75rem;">@r.DriverName &mdash; @r.Status.ToDisplayName()</div>
+                                    </div>
+                                    <span class="badge bg-light text-dark border">@r.NetPay.ToString("N0")</span>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -778,6 +851,7 @@ else
     private ComplianceSummaryDto? _compliance;
     private List<TyreListItemDto>? _tyres;
     private List<PartListItemDto>? _parts;
+    private List<PayRunListItemDto>? _payRuns;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -796,6 +870,7 @@ else
             _compliance = await Api.GetComplianceSummaryAsync(30);
             _tyres = await Api.GetTyresAsync();
             _parts = await Api.GetPartsAsync();
+            _payRuns = await Api.GetPayRunsAsync();
         }
         catch (Exception ex)
         {
@@ -862,6 +937,13 @@ else
             .OrderByDescending(c => c.Id)
             .Take(5)
             .ToList();
+
+    private int DraftPayRunCount => _payRuns?.Count(r => r.Status == PayRunStatus.Draft) ?? 0;
+    private decimal NetPayThisMonth =>
+        (_payRuns ?? new()).Where(r => r.Status != PayRunStatus.Cancelled && IsThisMonth(r.PeriodEnd)).Sum(r => r.NetPay);
+    private decimal AdvancesOutstanding => (_drivers ?? new()).Sum(d => d.AdvancesOutstanding);
+    private List<PayRunListItemDto> RecentPayRuns =>
+        (_payRuns ?? new()).OrderByDescending(r => r.PeriodEnd).ThenByDescending(r => r.Id).Take(5).ToList();
 
     private int PartsBelowReorderCount => _parts?.Count(p => p.BelowReorder) ?? 0;
     private decimal TotalStockValue => (_parts ?? new()).Sum(p => p.StockValue);

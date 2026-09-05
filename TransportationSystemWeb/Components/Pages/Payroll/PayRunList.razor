@@ -1,0 +1,183 @@
+@page "/payruns"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Driver Payroll</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Driver Payroll</h2>
+        <div class="text-muted small">Payroll &rsaquo; Pay Runs</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary" href="/payruns/generate"><i class="bi bi-magic me-1"></i>Generate</a>
+        <a class="btn btn-primary" href="/payruns/new"><i class="bi bi-plus-lg me-1"></i>New Pay Run</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Pay Runs</div>
+            <div class="stat-value">@(_runs?.Count ?? 0)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Draft</div>
+            <div class="stat-value text-warning">@(_runs?.Count(r => r.Status == PayRunStatus.Draft) ?? 0)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Net Pay (listed)</div>
+            <div class="stat-value">@((_runs?.Where(r => r.Status != PayRunStatus.Cancelled).Sum(r => r.NetPay) ?? 0).ToString("N0"))</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Advances Recovered</div>
+            <div class="stat-value">@((_runs?.Where(r => r.Status != PayRunStatus.Cancelled).Sum(r => r.AdvanceRecovery) ?? 0).ToString("N0"))</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-4">
+            <select class="form-select" @bind="_driverId">
+                <option value="">All drivers</option>
+                @if (_drivers is not null)
+                {
+                    @foreach (var d in _drivers)
+                    {
+                        <option value="@d.Id">@d.DriverCode &mdash; @d.FullName</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="_status">
+                <option value="">All statuses</option>
+                @foreach (var s in Enum.GetValues<PayRunStatus>())
+                {
+                    <option value="@s">@s.ToDisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <input class="form-control" placeholder="Search code, driver..." @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+        </div>
+        <div class="col-md-2 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="Load"><i class="bi bi-funnel me-1"></i>Apply</button>
+        </div>
+    </div>
+</div></div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_runs is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_runs.Count == 0)
+{
+    <div class="alert alert-info">No pay runs found. Use "Generate" to build one from a driver's trips, or "New Pay Run" to start blank.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Code</th><th>Driver</th><th>Period</th><th>Status</th>
+                    <th class="text-end">Gross</th><th class="text-end">Advance Rec.</th><th class="text-end">Net</th>
+                    <th class="text-end">Lines</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in _runs)
+                {
+                    <tr>
+                        <td class="font-monospace">@r.PayRunCode</td>
+                        <td>@r.DriverName</td>
+                        <td>@r.PeriodStart.ToString("dd-MMM-yy") &ndash; @r.PeriodEnd.ToString("dd-MMM-yy")</td>
+                        <td><span class="badge @StatusClass(r.Status)">@r.Status.ToDisplayName()</span></td>
+                        <td class="text-end">@r.GrossPay.ToString("N2")</td>
+                        <td class="text-end">@r.AdvanceRecovery.ToString("N2")</td>
+                        <td class="text-end fw-semibold">@r.NetPay.ToString("N2")</td>
+                        <td class="text-end">@r.LineCount</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/payruns/@r.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(r.Id)" title="Delete pay run"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<PayRunListItemDto>? _runs;
+    private List<DriverListItemDto>? _drivers;
+    private string _driverId = "";
+    private string _status = "";
+    private string _search = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _drivers = await Api.GetDriversAsync(); } catch { _drivers = new(); }
+        await Load();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            int? driverId = int.TryParse(_driverId, out var d) ? d : null;
+            PayRunStatus? status = Enum.TryParse<PayRunStatus>(_status, out var s) ? s : null;
+            _runs = await Api.GetPayRunsAsync(driverId, status, _search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load pay runs: {ex.Message}";
+            _runs = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this pay run and its lines? This cannot be undone.")) return;
+        try
+        {
+            await Api.DeletePayRunAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete pay run: {ex.Message}";
+        }
+    }
+
+    private static string StatusClass(PayRunStatus s) => s switch
+    {
+        PayRunStatus.Draft => "bg-warning text-dark",
+        PayRunStatus.Approved => "bg-info text-dark",
+        PayRunStatus.Paid => "bg-success",
+        PayRunStatus.Cancelled => "bg-secondary",
+        _ => "bg-light text-dark"
+    };
+}

@@ -23,7 +23,7 @@ public class DriversController : ControllerBase
         [FromQuery] DriverStatus? status,
         [FromQuery] string? search)
     {
-        var query = _db.Drivers.AsNoTracking().AsQueryable();
+        var query = _db.Drivers.AsNoTracking().Include(d => d.Advances).AsQueryable();
 
         if (status.HasValue)
             query = query.Where(d => d.Status == status.Value);
@@ -98,6 +98,7 @@ public class DriversController : ControllerBase
         return await _db.Drivers
             .Include(d => d.Documents)
             .Include(d => d.Assignments).ThenInclude(a => a.Vehicle)
+            .Include(d => d.Advances)
             .AsSplitQuery()
             .FirstOrDefaultAsync(d => d.Id == id);
     }

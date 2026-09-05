@@ -730,6 +730,107 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Driver Payroll (module 8) -----
+
+    public async Task<List<DriverAdvanceDto>> GetDriverAdvancesAsync(int driverId)
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<List<DriverAdvanceDto>>($"api/drivers/{driverId}/advances", JsonOptions) ?? new();
+    }
+
+    public async Task<DriverAdvanceDto> CreateDriverAdvanceAsync(int driverId, DriverAdvanceUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/drivers/{driverId}/advances", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<DriverAdvanceDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateDriverAdvanceAsync(int driverId, int advanceId, DriverAdvanceUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/drivers/{driverId}/advances/{advanceId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteDriverAdvanceAsync(int driverId, int advanceId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/drivers/{driverId}/advances/{advanceId}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<List<PayRunListItemDto>> GetPayRunsAsync(int? driverId = null, PayRunStatus? status = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (driverId.HasValue) query.Add($"driverId={driverId}");
+        if (status.HasValue) query.Add($"status={status}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+        return await _http.GetFromJsonAsync<List<PayRunListItemDto>>($"api/payruns{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<PayRunDetailDto?> GetPayRunAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/payruns/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<PayRunDetailDto>(JsonOptions);
+    }
+
+    public async Task<PayRunDetailDto> CreatePayRunAsync(PayRunUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/payruns", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<PayRunDetailDto>(JsonOptions))!;
+    }
+
+    public async Task<PayRunDetailDto> GeneratePayRunAsync(GeneratePayRunDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/payruns/generate", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<PayRunDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdatePayRunAsync(int id, PayRunUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/payruns/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeletePayRunAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/payruns/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<PayRunLineDto> CreatePayRunLineAsync(int payRunId, PayRunLineUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/payruns/{payRunId}/lines", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<PayRunLineDto>(JsonOptions))!;
+    }
+
+    public async Task UpdatePayRunLineAsync(int payRunId, int lineId, PayRunLineUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/payruns/{payRunId}/lines/{lineId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeletePayRunLineAsync(int payRunId, int lineId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/payruns/{payRunId}/lines/{lineId}");
+        await EnsureSuccess(response);
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

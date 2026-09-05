@@ -35,6 +35,9 @@ public class FleetDbContext : DbContext
     public DbSet<TyreEvent> TyreEvents => Set<TyreEvent>();
     public DbSet<Part> Parts => Set<Part>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<DriverAdvance> DriverAdvances => Set<DriverAdvance>();
+    public DbSet<PayRun> PayRuns => Set<PayRun>();
+    public DbSet<PayRunLine> PayRunLines => Set<PayRunLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -129,6 +132,7 @@ public class FleetDbContext : DbContext
         {
             entity.HasIndex(d => d.DriverCode).IsUnique();
             entity.HasIndex(d => d.LicenseNumber).IsUnique();
+            entity.Property(d => d.PayRate).HasPrecision(18, 2);
 
             entity.HasMany(d => d.Documents)
                 .WithOne(doc => doc.Driver)
@@ -139,6 +143,43 @@ public class FleetDbContext : DbContext
                 .WithOne(a => a.Driver)
                 .HasForeignKey(a => a.DriverId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(d => d.Advances)
+                .WithOne(a => a.Driver)
+                .HasForeignKey(a => a.DriverId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DriverAdvance>(entity =>
+        {
+            entity.Property(a => a.Amount).HasPrecision(18, 2);
+            entity.Property(a => a.RecoveredAmount).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<PayRun>(entity =>
+        {
+            entity.HasIndex(p => p.PayRunCode).IsUnique();
+            entity.Property(p => p.AllowancesTotal).HasPrecision(18, 2);
+            entity.Property(p => p.AdvanceRecovery).HasPrecision(18, 2);
+
+            entity.HasOne(p => p.Driver)
+                .WithMany()
+                .HasForeignKey(p => p.DriverId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(p => p.Lines)
+                .WithOne(l => l.PayRun)
+                .HasForeignKey(l => l.PayRunId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PayRunLine>(entity =>
+        {
+            entity.Property(l => l.Quantity).HasPrecision(18, 2);
+            entity.Property(l => l.Rate).HasPrecision(18, 2);
+            entity.Property(l => l.Amount).HasPrecision(18, 2);
+            entity.HasIndex(l => l.TripId);
+            // TripId is a soft link only -- no relationship / FK configured.
         });
 
         modelBuilder.Entity<DriverVehicleAssignment>(entity =>

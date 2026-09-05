@@ -98,6 +98,18 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @(SubLinkClass("/payruns") == "active" ? "active-module" : "")" title="Driver Payroll">
+                    <i class="bi bi-cash-coin"></i> <span class="nav-text">Driver Payroll</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/payruns")" href="/payruns" title="Pay Runs">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Pay Runs</span>
+                </a>
+                <a class="nav-sublink @(Nav.ToBaseRelativePath(Nav.Uri).StartsWith("payruns/generate", StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="/payruns/generate" title="Generate">
+                    <i class="bi bi-magic"></i> <span class="nav-text">Generate</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/tyres") == "active" ? "active-module" : "")" title="Tyre Management">
                     <i class="bi bi-circle"></i> <span class="nav-text">Tyre Management</span>
                 </div>

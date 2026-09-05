@@ -148,6 +148,82 @@ else
                 </table>
             </div></div>
         }
+        else if (_activeTab == "Payroll")
+        {
+            <div class="card mb-3"><div class="card-body">
+                <h5 class="card-title">Pay Configuration</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Pay Type</label>
+                        <InputSelect class="form-select" @bind-Value="_model.PayType">
+                            @foreach (var t in Enum.GetValues<DriverPayType>())
+                            {
+                                <option value="@t">@t.ToDisplayName()</option>
+                            }
+                        </InputSelect>
+                        <div class="form-text">
+                            @(_model.PayType switch
+                            {
+                                DriverPayType.PerTrip => "Rate = amount paid per completed trip.",
+                                DriverPayType.PerKm => "Rate = amount per km (enter distance on each pay-run line).",
+                                DriverPayType.Monthly => "Rate = flat amount for the pay period.",
+                                DriverPayType.Percentage => "Rate = percent of each trip's revenue.",
+                                _ => ""
+                            })
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Pay Rate</label>
+                        <InputNumber class="form-control" @bind-Value="_model.PayRate" />
+                        <ValidationMessage For="() => _model.PayRate" />
+                    </div>
+                </div>
+                <div class="text-muted small mt-2">Changes here are saved with the <strong>Save Changes</strong> button below.</div>
+            </div></div>
+
+            @if (_detail is not null)
+            {
+                <div class="card"><div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="card-title mb-0">Advances (Khata)</h5>
+                        <div class="text-muted small">Outstanding: <strong class="@(_detail.AdvancesOutstanding > 0 ? "text-danger" : "")">@_detail.AdvancesOutstanding.ToString("N2")</strong></div>
+                    </div>
+
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-2"><label class="form-label">Date</label><input type="date" class="form-control" @bind="_newAdvance.Date" /></div>
+                        <div class="col-md-2"><label class="form-label">Amount</label><input type="number" step="0.01" class="form-control" @bind="_newAdvance.Amount" /></div>
+                        <div class="col-md-4"><label class="form-label">Reason</label><input class="form-control" @bind="_newAdvance.Reason" /></div>
+                        <div class="col-md-3"><label class="form-label">Notes</label><input class="form-control" @bind="_newAdvance.Notes" /></div>
+                        <div class="col-md-1 d-grid"><button type="button" class="btn btn-primary" @onclick="AddAdvance"><i class="bi bi-plus-lg"></i></button></div>
+                    </div>
+
+                    <table class="table table-sm align-middle">
+                        <thead><tr><th>Date</th><th class="text-end">Amount</th><th class="text-end">Recovered</th><th class="text-end">Outstanding</th><th>Reason</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var a in _detail.Advances)
+                        {
+                            <tr>
+                                <td>@a.Date.ToString("dd-MMM-yyyy")</td>
+                                <td class="text-end">@a.Amount.ToString("N2")</td>
+                                <td class="text-end" style="max-width:120px">
+                                    <input type="number" step="0.01" class="form-control form-control-sm text-end"
+                                           @bind="_recoveredEdits[a.Id]" @bind:after="() => SaveRecovered(a.Id)" />
+                                </td>
+                                <td class="text-end @(a.Outstanding > 0 ? "text-danger" : "text-success")">@a.Outstanding.ToString("N2")</td>
+                                <td>@(string.IsNullOrWhiteSpace(a.Reason) ? "—" : a.Reason)</td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAdvance(a.Id)"><i class="bi bi-trash"></i></button></td>
+                            </tr>
+                        }
+                        @if (_detail.Advances.Count == 0)
+                        {
+                            <tr><td colspan="6" class="text-muted small">No advances recorded.</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                    <div class="text-muted small">Recovered amounts are entered here; pay runs record their own advance-recovery figure separately.</div>
+                </div></div>
+            }
+        }
         else if (_activeTab == "Vehicle Assignments" && _detail is not null)
         {
             <div class="card"><div class="card-body">
@@ -210,7 +286,7 @@ else
 
     private bool IsNew => Id is null;
 
-    private static readonly string[] Tabs = { "Driver Details", "License & Documents", "Vehicle Assignments" };
+    private static readonly string[] Tabs = { "Driver Details", "License & Documents", "Vehicle Assignments", "Payroll" };
 
     private string _activeTab = "Driver Details";
     private bool _loading = true;
@@ -224,6 +300,9 @@ else
     private DriverDocumentCategory _uploadCategory = DriverDocumentCategory.DrivingLicense;
 
     private DriverVehicleAssignmentUpsertDto _newAssignment = new() { StartDate = DateOnly.FromDateTime(DateTime.Today) };
+
+    private DriverAdvanceUpsertDto _newAdvance = new() { Date = DateOnly.FromDateTime(DateTime.Today) };
+    private Dictionary<int, decimal> _recoveredEdits = new();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -248,6 +327,7 @@ else
                 else
                 {
                     _model = _detail;
+                    _recoveredEdits = _detail.Advances.ToDictionary(a => a.Id, a => a.RecoveredAmount);
                 }
             }
             else
@@ -354,6 +434,68 @@ else
         catch (Exception ex)
         {
             _error = $"Failed to delete assignment: {ex.Message}";
+        }
+    }
+
+    // ----- Advances -----
+
+    private async Task AddAdvance()
+    {
+        if (_detail is null) return;
+        if (_newAdvance.Amount <= 0)
+        {
+            _error = "Enter an advance amount greater than zero.";
+            return;
+        }
+        try
+        {
+            await Api.CreateDriverAdvanceAsync(_detail.Id, _newAdvance);
+            _newAdvance = new() { Date = DateOnly.FromDateTime(DateTime.Today) };
+            _activeTab = "Payroll";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add advance: {ex.Message}";
+        }
+    }
+
+    private async Task SaveRecovered(int advanceId)
+    {
+        if (_detail is null) return;
+        var a = _detail.Advances.FirstOrDefault(x => x.Id == advanceId);
+        if (a is null) return;
+        try
+        {
+            await Api.UpdateDriverAdvanceAsync(_detail.Id, advanceId, new DriverAdvanceUpsertDto
+            {
+                Date = a.Date,
+                Amount = a.Amount,
+                RecoveredAmount = _recoveredEdits[advanceId],
+                Reason = a.Reason,
+                Notes = a.Notes
+            });
+            _activeTab = "Payroll";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to update recovered amount: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteAdvance(int advanceId)
+    {
+        if (_detail is null) return;
+        try
+        {
+            await Api.DeleteDriverAdvanceAsync(_detail.Id, advanceId);
+            _activeTab = "Payroll";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete advance: {ex.Message}";
         }
     }
 

@@ -71,7 +71,11 @@ public class TripsController : ControllerBase
             .Where(f => f.TripId == id)
             .SumAsync(f => (decimal?)f.TotalCost) ?? 0m;
 
-        return TripMapper.ToDetailDto(trip, fuelCost);
+        var driverPay = await _db.PayRunLines
+            .Where(l => l.TripId == id)
+            .SumAsync(l => (decimal?)l.Amount) ?? 0m;
+
+        return TripMapper.ToDetailDto(trip, fuelCost, driverPay);
     }
 
     [HttpPost]

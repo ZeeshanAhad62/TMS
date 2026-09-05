@@ -1,0 +1,153 @@
+@page "/payruns/generate"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Generate Pay Run - Driver Payroll</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Generate Pay Run</h2>
+        <div class="text-muted small">Payroll &rsaquo; Pay Runs &rsaquo; Generate</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="/payruns"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+</div>
+
+<div class="text-muted small mb-3">
+    Builds a <strong>Draft</strong> pay run from the driver's pay configuration and their
+    <strong>Completed</strong> trips whose start date falls in the period. Review and adjust the lines afterwards.
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_drivers is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="card"><div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-5">
+                <label class="form-label">Driver *</label>
+                <select class="form-select" @bind="_driverId" @bind:after="OnDriverChanged">
+                    <option value="">Select a driver...</option>
+                    @foreach (var d in _drivers)
+                    {
+                        <option value="@d.Id">@d.DriverCode &mdash; @d.FullName</option>
+                    }
+                </select>
+                @if (_selectedDriver is not null)
+                {
+                    <div class="form-text">
+                        Pay type: <strong>@_selectedDriver.PayType.ToDisplayName()</strong>,
+                        rate: <strong>@(_selectedDriver.PayRate?.ToString("N2") ?? "not set")</strong>,
+                        advances outstanding: <strong>@_selectedDriver.AdvancesOutstanding.ToString("N2")</strong>
+                        @if (_selectedDriver.PayType == DriverPayType.PerKm)
+                        {
+                            <text> &mdash; per-km lines can't be auto-valued (trips carry no distance); a zero line is seeded for you to fill in.</text>
+                        }
+                        else if ((_selectedDriver.PayRate ?? 0) <= 0)
+                        {
+                            <span class="text-danger"> &mdash; set a pay rate on the driver before generating.</span>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Period Start *</label>
+                <input type="date" class="form-control" @bind="_start" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Period End *</label>
+                <input type="date" class="form-control" @bind="_end" />
+            </div>
+            <div class="col-md-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="recoverAdv" @bind="_recoverAdvances" />
+                    <label class="form-check-label" for="recoverAdv">
+                        Pre-fill advance recovery with the driver's outstanding advances (capped at gross pay)
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="Generate" disabled="@_busy">
+                <i class="bi bi-magic me-1"></i>@(_busy ? "Generating..." : "Generate Draft Pay Run")
+            </button>
+        </div>
+    </div></div>
+}
+
+@code {
+    private List<DriverListItemDto>? _drivers;
+    private DriverDetailDto? _selectedDriver;
+    private string _driverId = "";
+    private DateOnly _start = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateOnly _end = DateOnly.FromDateTime(DateTime.Today);
+    private bool _recoverAdvances = true;
+    private bool _busy;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _drivers = (await Api.GetDriversAsync()).OrderBy(d => d.DriverCode).ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load drivers: {ex.Message}";
+            _drivers = new();
+        }
+    }
+
+    private async Task OnDriverChanged()
+    {
+        _selectedDriver = null;
+        if (int.TryParse(_driverId, out var id))
+        {
+            try { _selectedDriver = await Api.GetDriverAsync(id); } catch { /* show nothing */ }
+        }
+    }
+
+    private async Task Generate()
+    {
+        _error = null;
+        if (!int.TryParse(_driverId, out var driverId))
+        {
+            _error = "Select a driver.";
+            return;
+        }
+        if (_end < _start)
+        {
+            _error = "Period end cannot be before period start.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var run = await Api.GeneratePayRunAsync(new GeneratePayRunDto
+            {
+                DriverId = driverId,
+                PeriodStart = _start,
+                PeriodEnd = _end,
+                RecoverAdvances = _recoverAdvances
+            });
+            Nav.NavigateTo($"/payruns/{run.Id}/edit");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

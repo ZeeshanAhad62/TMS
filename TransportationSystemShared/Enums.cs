@@ -216,3 +216,31 @@ public enum StockMovementReferenceType
     Manual,
     WorkOrder
 }
+
+// Per-driver pay basis (Driver.PayType).
+public enum DriverPayType
+{
+    PerTrip,
+    PerKm,
+    Monthly,
+    Percentage
+}
+
+// User-set intent on a pay run. Gross / net figures are always derived.
+public enum PayRunStatus
+{
+    Draft,
+    Approved,
+    Paid,
+    Cancelled
+}
+
+// How a single pay-run line's amount was arrived at. Manual = entered by hand.
+public enum PayRunLineBasis
+{
+    PerTrip,
+    PerKm,
+    Monthly,
+    Percentage,
+    Manual
+}

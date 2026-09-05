@@ -19,10 +19,17 @@ public class Driver
 
     public DriverStatus Status { get; set; } = DriverStatus.Active;
 
+    // Pay configuration (Payroll module). PayRate is interpreted per PayType:
+    // PerTrip = amount per completed trip, PerKm = amount per km, Monthly =
+    // fixed amount for the period, Percentage = percent of trip revenue.
+    public DriverPayType PayType { get; set; } = DriverPayType.PerTrip;
+    public decimal? PayRate { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
     // Navigation
     public List<DriverDocument> Documents { get; set; } = new();
     public List<DriverVehicleAssignment> Assignments { get; set; } = new();
+    public List<DriverAdvance> Advances { get; set; } = new();
 }

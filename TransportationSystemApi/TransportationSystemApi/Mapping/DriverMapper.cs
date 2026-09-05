@@ -16,7 +16,8 @@ public static class DriverMapper
         LicenseNumber = d.LicenseNumber,
         Status = d.Status,
         LicenseExpiryDate = d.LicenseExpiryDate,
-        HasExpiringDocument = IsExpiringOrExpired(d.LicenseExpiryDate)
+        HasExpiringDocument = IsExpiringOrExpired(d.LicenseExpiryDate),
+        AdvancesOutstanding = PayrollMapper.AdvancesOutstanding(d.Advances)
     };
 
     public static DriverDetailDto ToDetailDto(Driver d) => new()
@@ -34,9 +35,14 @@ public static class DriverMapper
         LicenseType = d.LicenseType,
         LicenseExpiryDate = d.LicenseExpiryDate,
         Status = d.Status,
+        PayType = d.PayType,
+        PayRate = d.PayRate,
+
+        AdvancesOutstanding = PayrollMapper.AdvancesOutstanding(d.Advances),
 
         Documents = d.Documents.Select(ToDto).ToList(),
-        Assignments = d.Assignments.OrderByDescending(a => a.StartDate).Select(ToDto).ToList()
+        Assignments = d.Assignments.OrderByDescending(a => a.StartDate).Select(ToDto).ToList(),
+        Advances = d.Advances.OrderByDescending(a => a.Date).ThenByDescending(a => a.Id).Select(PayrollMapper.ToDto).ToList()
     };
 
     public static void ApplyUpsert(Driver d, DriverUpsertDto dto)
@@ -50,6 +56,8 @@ public static class DriverMapper
         d.LicenseType = dto.LicenseType;
         d.LicenseExpiryDate = dto.LicenseExpiryDate;
         d.Status = dto.Status;
+        d.PayType = dto.PayType;
+        d.PayRate = dto.PayRate;
     }
 
     public static DriverDocumentDto ToDto(DriverDocument d) => new()
