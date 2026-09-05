@@ -123,6 +123,11 @@ public class VehiclesController : ControllerBase
             });
         }
 
+        // GeofenceEvents.VehicleId uses ON DELETE NO ACTION (see migration 015) to
+        // avoid a multi-cascade path through Geofences; remove this vehicle's events
+        // explicitly. VehiclePositions cascade on their own.
+        await _db.GeofenceEvents.Where(e => e.VehicleId == id).ExecuteDeleteAsync();
+
         _db.Vehicles.Remove(vehicle);
         await _db.SaveChangesAsync();
         return NoContent();

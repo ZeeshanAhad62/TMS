@@ -244,3 +244,24 @@ public enum PayRunLineBasis
     Percentage,
     Manual
 }
+
+// GPS / Live Tracking (module 9).
+public enum GeofenceShape
+{
+    Circle,
+    Polygon
+}
+
+public enum GeofenceEventType
+{
+    Enter,
+    Exit
+}
+
+// Derived from the latest fix's age + speed + ignition -- never stored.
+public enum VehicleMovementState
+{
+    Moving,
+    Idle,
+    Offline
+}

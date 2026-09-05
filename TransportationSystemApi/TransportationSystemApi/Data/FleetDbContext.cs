@@ -38,6 +38,9 @@ public class FleetDbContext : DbContext
     public DbSet<DriverAdvance> DriverAdvances => Set<DriverAdvance>();
     public DbSet<PayRun> PayRuns => Set<PayRun>();
     public DbSet<PayRunLine> PayRunLines => Set<PayRunLine>();
+    public DbSet<VehiclePosition> VehiclePositions => Set<VehiclePosition>();
+    public DbSet<Geofence> Geofences => Set<Geofence>();
+    public DbSet<GeofenceEvent> GeofenceEvents => Set<GeofenceEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -335,6 +338,48 @@ public class FleetDbContext : DbContext
         modelBuilder.Entity<AlertLog>(entity =>
         {
             entity.HasIndex(l => new { l.EntityType, l.EntityId, l.DocumentType, l.ExpiryDate, l.Severity }).IsUnique();
+        });
+
+        modelBuilder.Entity<VehiclePosition>(entity =>
+        {
+            entity.Property(p => p.Latitude).HasPrecision(9, 6);
+            entity.Property(p => p.Longitude).HasPrecision(9, 6);
+            entity.Property(p => p.SpeedKph).HasPrecision(6, 2);
+            entity.Property(p => p.Heading).HasPrecision(6, 2);
+            entity.HasIndex(p => new { p.VehicleId, p.DeviceTimeUtc });
+
+            entity.HasOne(p => p.Vehicle)
+                .WithMany()
+                .HasForeignKey(p => p.VehicleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Geofence>(entity =>
+        {
+            entity.HasIndex(g => g.Name).IsUnique();
+            entity.Property(g => g.CenterLat).HasPrecision(9, 6);
+            entity.Property(g => g.CenterLng).HasPrecision(9, 6);
+            entity.Property(g => g.RadiusMeters).HasPrecision(10, 2);
+
+            entity.HasMany(g => g.Events)
+                .WithOne(e => e.Geofence)
+                .HasForeignKey(e => e.GeofenceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<GeofenceEvent>(entity =>
+        {
+            entity.Property(e => e.Latitude).HasPrecision(9, 6);
+            entity.Property(e => e.Longitude).HasPrecision(9, 6);
+            entity.HasIndex(e => new { e.VehicleId, e.OccurredAtUtc });
+            entity.HasIndex(e => new { e.GeofenceId, e.VehicleId, e.OccurredAtUtc });
+
+            // Vehicle FK is NO ACTION (Geofences already cascades here) -- match
+            // the migration; delete events explicitly when a vehicle is removed.
+            entity.HasOne(e => e.Vehicle)
+                .WithMany()
+                .HasForeignKey(e => e.VehicleId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }

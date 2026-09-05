@@ -1,0 +1,176 @@
+@page "/geofences"
+@attribute [Authorize]
+@implements IAsyncDisposable
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Geofences - GPS / Tracking</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Geofences</h2>
+        <div class="text-muted small">GPS / Tracking &rsaquo; Geofences</div>
+    </div>
+    <a class="btn btn-primary" href="/geofences/new"><i class="bi bi-plus-lg me-1"></i>New Geofence</a>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        @if (_fences is null)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else if (_fences.Count == 0)
+        {
+            <div class="alert alert-info">No geofences yet. Create one to start tracking enter/exit events.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover bg-white align-middle">
+                    <thead class="table-light">
+                        <tr><th>Name</th><th>Shape</th><th>Definition</th><th>Active</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var f in _fences)
+                        {
+                            <tr>
+                                <td>@f.Name</td>
+                                <td>@f.Shape.ToDisplayName()</td>
+                                <td class="small text-muted">
+                                    @if (f.Shape == GeofenceShape.Circle)
+                                    {
+                                        <text>@f.CenterLat?.ToString("0.0000"), @f.CenterLng?.ToString("0.0000") &middot; r @f.RadiusMeters?.ToString("0") m</text>
+                                    }
+                                    else
+                                    {
+                                        <text>@f.PointCount points</text>
+                                    }
+                                </td>
+                                <td>@(f.IsActive ? "Yes" : "No")</td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-outline-primary" href="/geofences/@f.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(f.Id)"><i class="bi bi-trash"></i></button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <div class="card mt-3"><div class="card-body">
+            <h6 class="mb-3">Recent enter / exit events</h6>
+            @if (_events is null)
+            {
+                <p><em>Loading...</em></p>
+            }
+            else if (_events.Count == 0)
+            {
+                <div class="text-muted small">No geofence events recorded yet.</div>
+            }
+            else
+            {
+                <table class="table table-sm">
+                    <thead><tr><th>When</th><th>Vehicle</th><th>Geofence</th><th>Event</th></tr></thead>
+                    <tbody>
+                        @foreach (var e in _events)
+                        {
+                            <tr>
+                                <td class="small">@e.OccurredAtUtc.ToLocalTime().ToString("dd-MMM HH:mm")</td>
+                                <td class="font-monospace small">@e.VehicleCode</td>
+                                <td>@e.GeofenceName</td>
+                                <td><span class="badge @(e.EventType == GeofenceEventType.Enter ? "bg-success" : "bg-secondary")">@e.EventType</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div></div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card"><div class="card-body p-0">
+            <div id="fenceMap" style="height: 420px; border-radius: .5rem;"></div>
+        </div></div>
+    </div>
+</div>
+
+@code {
+    private List<GeofenceListItemDto>? _fences;
+    private List<GeofenceEventDto>? _events;
+    private string? _error;
+    private bool _mapReady;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("trackingMap.init", "fenceMap", new[] { 24.8607, 67.0011 }, 6);
+            _mapReady = true;
+            await PushToMap();
+        }
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _fences = await Api.GetGeofencesAsync();
+            _events = await Api.GetGeofenceEventsAsync(take: 25);
+            _error = null;
+            await PushToMap();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load geofences: {ex.Message}";
+            _fences ??= new();
+            _events ??= new();
+        }
+    }
+
+    private async Task PushToMap()
+    {
+        if (!_mapReady || _fences is null) return;
+        var shapes = new List<object>();
+        foreach (var f in _fences)
+        {
+            if (f.Shape == GeofenceShape.Circle)
+            {
+                shapes.Add(new { name = f.Name, shape = "Circle", isActive = f.IsActive, centerLat = f.CenterLat, centerLng = f.CenterLng, radiusMeters = f.RadiusMeters });
+            }
+            else
+            {
+                var detail = await Api.GetGeofenceAsync(f.Id);
+                var pts = GeofenceEditor.ParsePoints(detail?.PolygonJson);
+                shapes.Add(new { name = f.Name, shape = "Polygon", isActive = f.IsActive, polygon = pts });
+            }
+        }
+        await JS.InvokeVoidAsync("trackingMap.setGeofences", "fenceMap", shapes);
+    }
+
+    private async Task Delete(int id)
+    {
+        try
+        {
+            await Api.DeleteGeofenceAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete geofence: {ex.Message}";
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("trackingMap.dispose", "fenceMap"); } catch { }
+    }
+}

@@ -1,0 +1,98 @@
+@page "/tracking/replay"
+@attribute [Authorize]
+@implements IAsyncDisposable
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Trip Replay - GPS / Tracking</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Trip Replay</h2>
+        <div class="text-muted small">GPS / Tracking &rsaquo; Trip Replay</div>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" href="/tracking"><i class="bi bi-geo-alt me-1"></i>Live Map</a>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-8">
+            <label class="form-label">Trip</label>
+            <select class="form-select" @bind="_tripId" @bind:after="LoadPath">
+                <option value="">Select a trip...</option>
+                @foreach (var t in _trips)
+                {
+                    <option value="@t.Id">@t.TripCode — @t.VehicleRegistrationNumber (@t.Origin → @t.Destination, @t.StartDate.ToString("dd-MMM-yy"))</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            @if (_path is not null)
+            {
+                <div class="text-muted small">
+                    @_path.Points.Count fixes &middot;
+                    @_path.FromUtc.ToLocalTime().ToString("dd-MMM HH:mm") – @_path.ToUtc.ToLocalTime().ToString("dd-MMM HH:mm")
+                </div>
+            }
+        </div>
+    </div>
+</div></div>
+
+<div class="card"><div class="card-body p-0">
+    <div id="replayMap" style="height: 560px; border-radius: .5rem;"></div>
+</div></div>
+
+@if (_path is not null && _path.Points.Count == 0)
+{
+    <div class="alert alert-info mt-3">No GPS fixes were recorded for this trip's vehicle during its date range.</div>
+}
+
+@code {
+    private List<TripListItemDto> _trips = new();
+    private string _tripId = "";
+    private TripPathDto? _path;
+    private string? _error;
+    private bool _mapReady;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _trips = await Api.GetTripsAsync(); }
+        catch (Exception ex) { _error = $"Failed to load trips: {ex.Message}"; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("trackingMap.init", "replayMap", new[] { 24.8607, 67.0011 }, 6);
+            _mapReady = true;
+        }
+    }
+
+    private async Task LoadPath()
+    {
+        _path = null;
+        _error = null;
+        if (!int.TryParse(_tripId, out var id)) return;
+        try
+        {
+            _path = await Api.GetTripPathAsync(id);
+            if (_mapReady)
+                await JS.InvokeVoidAsync("trackingMap.drawPath", "replayMap", _path?.Points ?? new());
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load trip path: {ex.Message}";
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("trackingMap.dispose", "replayMap"); } catch { }
+    }
+}

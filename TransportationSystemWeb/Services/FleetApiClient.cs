@@ -831,6 +831,97 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- GPS / Live Tracking (module 9) -----
+
+    public async Task<IngestResultDto> IngestPositionsAsync(IngestRequestDto request)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/tracking/ingest", request, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<IngestResultDto>(JsonOptions))!;
+    }
+
+    public async Task<List<LiveVehicleDto>> GetLiveVehiclesAsync()
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<List<LiveVehicleDto>>("api/tracking/live", JsonOptions) ?? new();
+    }
+
+    public async Task<List<VehiclePositionDto>> GetVehicleHistoryAsync(int vehicleId, DateTime? from = null, DateTime? to = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (from.HasValue) query.Add($"from={Uri.EscapeDataString(from.Value.ToString("o"))}");
+        if (to.HasValue) query.Add($"to={Uri.EscapeDataString(to.Value.ToString("o"))}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+        return await _http.GetFromJsonAsync<List<VehiclePositionDto>>($"api/tracking/vehicle/{vehicleId}/history{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<VehiclePositionDto?> GetVehicleLatestPositionAsync(int vehicleId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/tracking/vehicle/{vehicleId}/latest");
+        if (!response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NoContent) return null;
+        return await response.Content.ReadFromJsonAsync<VehiclePositionDto>(JsonOptions);
+    }
+
+    public async Task<TripPathDto?> GetTripPathAsync(int tripId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/tracking/trip/{tripId}/path");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<TripPathDto>(JsonOptions);
+    }
+
+    public async Task<List<GeofenceEventDto>> GetGeofenceEventsAsync(int? vehicleId = null, int? geofenceId = null, int take = 100)
+    {
+        await AuthorizeAsync();
+        var query = new List<string> { $"take={take}" };
+        if (vehicleId.HasValue) query.Add($"vehicleId={vehicleId}");
+        if (geofenceId.HasValue) query.Add($"geofenceId={geofenceId}");
+        return await _http.GetFromJsonAsync<List<GeofenceEventDto>>($"api/tracking/geofence-events?{string.Join("&", query)}", JsonOptions) ?? new();
+    }
+
+    public async Task<List<GeofenceListItemDto>> GetGeofencesAsync(bool? activeOnly = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (activeOnly.HasValue) query.Add($"activeOnly={activeOnly.Value.ToString().ToLowerInvariant()}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+        return await _http.GetFromJsonAsync<List<GeofenceListItemDto>>($"api/geofences{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<GeofenceDetailDto?> GetGeofenceAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/geofences/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<GeofenceDetailDto>(JsonOptions);
+    }
+
+    public async Task<GeofenceDetailDto> CreateGeofenceAsync(GeofenceUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/geofences", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<GeofenceDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateGeofenceAsync(int id, GeofenceUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/geofences/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteGeofenceAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/geofences/{id}");
+        await EnsureSuccess(response);
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

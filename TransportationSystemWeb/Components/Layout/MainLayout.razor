@@ -143,6 +143,21 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @((SubLinkClass("/tracking") == "active" || SubLinkClass("/geofences") == "active") ? "active-module" : "")" title="GPS / Tracking">
+                    <i class="bi bi-geo-alt"></i> <span class="nav-text">GPS / Tracking</span>
+                </div>
+                <a class="nav-sublink @(RelPath == "tracking" ? "active" : "")" href="/tracking" title="Live Map">
+                    <i class="bi bi-map"></i> <span class="nav-text">Live Map</span>
+                </a>
+                <a class="nav-sublink @(RelPath.StartsWith("tracking/replay", StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="/tracking/replay" title="Trip Replay">
+                    <i class="bi bi-play-circle"></i> <span class="nav-text">Trip Replay</span>
+                </a>
+                <a class="nav-sublink @SubLinkClass("/geofences")" href="/geofences" title="Geofences">
+                    <i class="bi bi-bounding-box"></i> <span class="nav-text">Geofences</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/reports") == "active" ? "active-module" : "")" title="Reports &amp; Analytics">
                     <i class="bi bi-bar-chart"></i> <span class="nav-text">Reports &amp; Analytics</span>
                 </div>
@@ -262,6 +277,8 @@
         if (href == "/") return relativePath.Length == 0 ? "active" : "";
         return relativePath.StartsWith(href.TrimStart('/'), StringComparison.OrdinalIgnoreCase) ? "active" : "";
     }
+
+    private string RelPath => Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0];
 
     public void Dispose()
     {

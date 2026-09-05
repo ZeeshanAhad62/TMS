@@ -21,6 +21,7 @@
         <a class="btn btn-outline-primary btn-sm" href="/tyres"><i class="bi bi-circle me-1"></i>Tyres</a>
         <a class="btn btn-outline-primary btn-sm" href="/parts"><i class="bi bi-box-seam me-1"></i>Parts</a>
         <a class="btn btn-outline-primary btn-sm" href="/payruns"><i class="bi bi-cash-coin me-1"></i>Payroll</a>
+        <a class="btn btn-outline-primary btn-sm" href="/tracking"><i class="bi bi-geo-alt me-1"></i>Live Map</a>
     </div>
 </div>
 
@@ -838,6 +839,62 @@ else
             </div>
         </div>
     }
+
+    @if (_live is not null)
+    {
+        <div class="row g-3 mt-1">
+            <div class="col-lg-8">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Moving</div>
+                                    <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-truck"></i></div>
+                                </div>
+                                <div class="stat-value text-success">@LiveCount(VehicleMovementState.Moving)</div>
+                                <div class="stat-sub text-muted">On the move now</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Idle</div>
+                                    <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-pause-circle"></i></div>
+                                </div>
+                                <div class="stat-value text-warning">@LiveCount(VehicleMovementState.Idle)</div>
+                                <div class="stat-sub text-muted">Reporting but stopped</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="stat-label">Offline</div>
+                                    <div class="stat-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-wifi-off"></i></div>
+                                </div>
+                                <div class="stat-value text-muted">@LiveCount(VehicleMovementState.Offline)</div>
+                                <div class="stat-sub text-muted">No recent fix</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body d-flex flex-column">
+                        <h6 class="mb-3">GPS / Tracking</h6>
+                        <div class="text-muted small mb-3">@_live.Count(v => v.HasPosition) of @_live.Count vehicles have a position fix.</div>
+                        <a class="btn btn-outline-primary btn-sm mt-auto" href="/tracking"><i class="bi bi-geo-alt me-1"></i>Open Live Map</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -852,6 +909,7 @@ else
     private List<TyreListItemDto>? _tyres;
     private List<PartListItemDto>? _parts;
     private List<PayRunListItemDto>? _payRuns;
+    private List<LiveVehicleDto>? _live;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -871,6 +929,7 @@ else
             _tyres = await Api.GetTyresAsync();
             _parts = await Api.GetPartsAsync();
             _payRuns = await Api.GetPayRunsAsync();
+            _live = await Api.GetLiveVehiclesAsync();
         }
         catch (Exception ex)
         {
@@ -937,6 +996,8 @@ else
             .OrderByDescending(c => c.Id)
             .Take(5)
             .ToList();
+
+    private int LiveCount(VehicleMovementState s) => _live?.Count(v => v.MovementState == s) ?? 0;
 
     private int DraftPayRunCount => _payRuns?.Count(r => r.Status == PayRunStatus.Draft) ?? 0;
     private decimal NetPayThisMonth =>

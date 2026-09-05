@@ -476,7 +476,19 @@ else
                             }
                         </InputSelect>
                     </div>
-                    <div class="col-md-3"><label class="form-label">Current Location / Depot</label><InputText class="form-control" @bind-Value="_model.CurrentLocation" /></div>
+                    <div class="col-md-3">
+                        <label class="form-label">Current Location / Depot</label>
+                        <InputText class="form-control" @bind-Value="_model.CurrentLocation" />
+                        @if (_livePosition is not null)
+                        {
+                            <div class="form-text">
+                                <i class="bi bi-geo-alt-fill text-success"></i>
+                                Live: @_livePosition.Latitude.ToString("0.00000"), @_livePosition.Longitude.ToString("0.00000")
+                                <span class="text-muted">(@_livePosition.DeviceTimeUtc.ToLocalTime().ToString("dd-MMM HH:mm"))</span>
+                                &middot; <a href="/tracking">map</a>
+                            </div>
+                        }
+                    </div>
                     <div class="col-md-3"><label class="form-label">Assigned Driver</label><InputText class="form-control" @bind-Value="_model.AssignedDriver" placeholder="Driver Master coming soon" /></div>
                     <div class="col-md-3"><label class="form-label">Current Booking / Trip Ref.</label><InputText class="form-control" @bind-Value="_model.CurrentBookingReference" /></div>
                     <div class="col-md-3"><label class="form-label">Current Odometer Reading</label><InputNumber class="form-control" @bind-Value="_model.CurrentOdometerReading" /></div>
@@ -566,6 +578,7 @@ else
 
     private VehicleUpsertDto _model = new();
     private VehicleDetailDto? _detail;
+    private VehiclePositionDto? _livePosition;
 
     private DocumentCategory _uploadCategory = DocumentCategory.RegistrationCertificate;
 
@@ -601,6 +614,7 @@ else
                 else
                 {
                     _model = _detail;
+                    try { _livePosition = await Api.GetVehicleLatestPositionAsync(Id.Value); } catch { _livePosition = null; }
                 }
             }
             else

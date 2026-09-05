@@ -1,0 +1,237 @@
+@page "/tracking"
+@attribute [Authorize]
+@implements IAsyncDisposable
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Live Map - GPS / Tracking</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Live Map</h2>
+        <div class="text-muted small">GPS / Tracking &rsaquo; Live Map</div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <div class="form-check form-switch mb-0 me-2">
+            <input class="form-check-input" type="checkbox" id="autoRefresh" @bind="_autoRefresh" />
+            <label class="form-check-label small" for="autoRefresh">Auto-refresh</label>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Refresh"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+        <button class="btn btn-outline-primary btn-sm" @onclick="Simulate" disabled="@_simulating">
+            <i class="bi bi-broadcast-pin me-1"></i>@(_simulating ? "Sending..." : "Simulate movement")
+        </button>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-4"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Moving</div><div class="stat-value text-success">@Count(VehicleMovementState.Moving)</div>
+    </div></div></div>
+    <div class="col-4"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Idle</div><div class="stat-value text-warning">@Count(VehicleMovementState.Idle)</div>
+    </div></div></div>
+    <div class="col-4"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Offline</div><div class="stat-value text-muted">@Count(VehicleMovementState.Offline)</div>
+    </div></div></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card"><div class="card-body p-0">
+            <div id="liveMap" style="height: 540px; border-radius: .5rem;"></div>
+        </div></div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100"><div class="card-body">
+            <h6 class="mb-3">Fleet <span class="text-muted small">(@(_vehicles?.Count ?? 0))</span></h6>
+            @if (_vehicles is null)
+            {
+                <p><em>Loading...</em></p>
+            }
+            else
+            {
+                <div style="max-height: 480px; overflow-y: auto;">
+                    @foreach (var v in _vehicles.OrderBy(v => v.MovementState).ThenBy(v => v.VehicleCode))
+                    {
+                        <div class="side-list-row">
+                            <div class="side-list-icon @StateBg(v.MovementState)"><i class="bi bi-truck"></i></div>
+                            <div class="flex-grow-1 text-truncate">
+                                <div class="font-monospace small">@v.VehicleCode</div>
+                                <div class="text-muted" style="font-size:.75rem;">
+                                    @v.RegistrationNumber
+                                    @if (v.HasPosition)
+                                    {
+                                        <text> &middot; @(v.SpeedKph?.ToString("0.#") ?? "?") km/h &middot; @AgeText(v.MinutesSinceReport)</text>
+                                    }
+                                    else
+                                    {
+                                        <text> &middot; no fix</text>
+                                    }
+                                </div>
+                            </div>
+                            <span class="badge @StateBadge(v.MovementState)">@v.MovementState</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div></div>
+    </div>
+</div>
+
+@code {
+    private List<LiveVehicleDto>? _vehicles;
+    private bool _autoRefresh = true;
+    private bool _simulating;
+    private string? _error;
+
+    private PeriodicTimer? _timer;
+    private Task? _loop;
+    private bool _mapReady;
+
+    // Client-side dead-reckoning seed for the simulator.
+    private readonly Dictionary<int, (double Lat, double Lng)> _simPos = new();
+    private static readonly (double Lat, double Lng) SeedCenter = (24.8607, 67.0011); // Karachi
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("trackingMap.init", "liveMap", new[] { SeedCenter.Lat, SeedCenter.Lng }, 6);
+            _mapReady = true;
+            await PushToMap();
+
+            _timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+            _loop = RefreshLoop();
+        }
+    }
+
+    private async Task RefreshLoop()
+    {
+        try
+        {
+            while (await _timer!.WaitForNextTickAsync())
+            {
+                if (!_autoRefresh) continue;
+                await Load();
+                await InvokeAsync(StateHasChanged);
+                await PushToMap();
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _vehicles = await Api.GetLiveVehiclesAsync();
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load live positions: {ex.Message}";
+        }
+    }
+
+    private async Task Refresh()
+    {
+        await Load();
+        await PushToMap();
+    }
+
+    private async Task PushToMap()
+    {
+        if (_mapReady && _vehicles is not null)
+            await JS.InvokeVoidAsync("trackingMap.setVehicles", "liveMap", _vehicles);
+    }
+
+    private async Task Simulate()
+    {
+        if (_vehicles is null || _vehicles.Count == 0) return;
+        _simulating = true;
+        _error = null;
+        try
+        {
+            var rng = Random.Shared;
+            var reports = new List<PositionReportDto>();
+            foreach (var v in _vehicles)
+            {
+                (double Lat, double Lng) cur =
+                    _simPos.TryGetValue(v.VehicleId, out var p)
+                        ? p
+                        : v is { HasPosition: true, Latitude: not null, Longitude: not null }
+                            ? ((double)v.Latitude!.Value, (double)v.Longitude!.Value)
+                            : (SeedCenter.Lat + (rng.NextDouble() - 0.5) * 0.4, SeedCenter.Lng + (rng.NextDouble() - 0.5) * 0.4);
+
+                var next = (Lat: cur.Lat + (rng.NextDouble() - 0.5) * 0.02,
+                            Lng: cur.Lng + (rng.NextDouble() - 0.5) * 0.02);
+                _simPos[v.VehicleId] = next;
+
+                reports.Add(new PositionReportDto
+                {
+                    VehicleId = v.VehicleId,
+                    Latitude = (decimal)Math.Round(next.Lat, 6),
+                    Longitude = (decimal)Math.Round(next.Lng, 6),
+                    SpeedKph = rng.Next(0, 90),
+                    Heading = rng.Next(0, 360),
+                    Ignition = true,
+                    DeviceTimeUtc = DateTime.UtcNow,
+                    Source = "simulator"
+                });
+            }
+
+            await Api.IngestPositionsAsync(new IngestRequestDto { Reports = reports });
+            await Load();
+            await PushToMap();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Simulation failed: {ex.Message}";
+        }
+        finally
+        {
+            _simulating = false;
+        }
+    }
+
+    private int Count(VehicleMovementState s) => _vehicles?.Count(v => v.MovementState == s) ?? 0;
+
+    private static string AgeText(double? minutes) => minutes switch
+    {
+        null => "n/a",
+        < 1 => "just now",
+        < 60 => $"{minutes:0} min ago",
+        _ => $"{minutes / 60:0.#} h ago"
+    };
+
+    private static string StateBadge(VehicleMovementState s) => s switch
+    {
+        VehicleMovementState.Moving => "bg-success",
+        VehicleMovementState.Idle => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    private static string StateBg(VehicleMovementState s) => s switch
+    {
+        VehicleMovementState.Moving => "bg-success bg-opacity-10 text-success",
+        VehicleMovementState.Idle => "bg-warning bg-opacity-10 text-warning",
+        _ => "bg-secondary bg-opacity-10 text-secondary"
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        _timer?.Dispose();
+        if (_loop is not null)
+        {
+            try { await _loop; } catch { }
+        }
+        try { await JS.InvokeVoidAsync("trackingMap.dispose", "liveMap"); } catch { }
+    }
+}

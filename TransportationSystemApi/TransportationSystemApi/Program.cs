@@ -36,6 +36,8 @@ builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<ComplianceAlertService>();
 builder.Services.AddHostedService<ComplianceAlertHostedService>();
 
+builder.Services.Configure<TrackingOptions>(builder.Configuration.GetSection("Tracking"));
+
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key is not configured.");
 
