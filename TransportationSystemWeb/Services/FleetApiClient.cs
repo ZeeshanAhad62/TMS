@@ -1019,6 +1019,120 @@ public class FleetApiClient
         return await response.Content.ReadFromJsonAsync<RateQuoteDto>(JsonOptions);
     }
 
+    // ----- Vendors & Procurement (module 11) -----
+
+    public async Task<List<VendorListItemDto>> GetVendorsAsync(VendorType? vendorType = null, bool? activeOnly = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (vendorType.HasValue) query.Add($"vendorType={vendorType}");
+        if (activeOnly.HasValue) query.Add($"activeOnly={activeOnly.Value.ToString().ToLowerInvariant()}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+        return await _http.GetFromJsonAsync<List<VendorListItemDto>>($"api/vendors{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<VendorDetailDto?> GetVendorAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/vendors/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<VendorDetailDto>(JsonOptions);
+    }
+
+    public async Task<VendorDetailDto> CreateVendorAsync(VendorUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/vendors", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<VendorDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateVendorAsync(int id, VendorUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/vendors/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteVendorAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/vendors/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<List<PurchaseOrderListItemDto>> GetPurchaseOrdersAsync(int? vendorId = null, PurchaseOrderStatus? status = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (vendorId.HasValue) query.Add($"vendorId={vendorId}");
+        if (status.HasValue) query.Add($"status={status}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+        return await _http.GetFromJsonAsync<List<PurchaseOrderListItemDto>>($"api/purchase-orders{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<PurchaseOrderDetailDto?> GetPurchaseOrderAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/purchase-orders/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<PurchaseOrderDetailDto>(JsonOptions);
+    }
+
+    public async Task<PurchaseOrderDetailDto> CreatePurchaseOrderAsync(PurchaseOrderUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/purchase-orders", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<PurchaseOrderDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdatePurchaseOrderAsync(int id, PurchaseOrderUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/purchase-orders/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeletePurchaseOrderAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/purchase-orders/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<PurchaseOrderLineDto> CreatePurchaseOrderLineAsync(int poId, PurchaseOrderLineUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/purchase-orders/{poId}/lines", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<PurchaseOrderLineDto>(JsonOptions))!;
+    }
+
+    public async Task UpdatePurchaseOrderLineAsync(int poId, int lineId, PurchaseOrderLineUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/purchase-orders/{poId}/lines/{lineId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeletePurchaseOrderLineAsync(int poId, int lineId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/purchase-orders/{poId}/lines/{lineId}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<ReceiveGoodsResultDto> ReceivePurchaseOrderAsync(int poId, ReceiveGoodsDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/purchase-orders/{poId}/receive", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<ReceiveGoodsResultDto>(JsonOptions))!;
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

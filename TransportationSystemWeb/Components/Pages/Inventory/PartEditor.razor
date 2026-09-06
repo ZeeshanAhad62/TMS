@@ -173,7 +173,11 @@ else
                         <td>@m.MovementType.ToDisplayName()</td>
                         <td class="text-end">@m.Quantity.ToString("0.##")</td>
                         <td class="text-end">@(m.UnitCost?.ToString("N2") ?? "—")</td>
-                        <td>@(m.ReferenceType == StockMovementReferenceType.WorkOrder ? $"Work Order #{m.ReferenceId}" : (m.SupplierName ?? "—"))</td>
+                        <td>@(m.ReferenceType switch {
+                            StockMovementReferenceType.WorkOrder => $"Work Order #{m.ReferenceId}",
+                            StockMovementReferenceType.PurchaseOrder => $"PO #{m.ReferenceId}" + (string.IsNullOrWhiteSpace(m.SupplierName) ? "" : $" · {m.SupplierName}"),
+                            _ => m.SupplierName ?? "—"
+                        })</td>
                         <td>@(string.IsNullOrWhiteSpace(m.Notes) ? "—" : m.Notes)</td>
                         <td class="text-end">
                             @if (m.ReferenceType == StockMovementReferenceType.Manual)

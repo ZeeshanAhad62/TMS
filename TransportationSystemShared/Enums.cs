@@ -214,7 +214,8 @@ public enum PartMovementType
 public enum StockMovementReferenceType
 {
     Manual,
-    WorkOrder
+    WorkOrder,
+    PurchaseOrder
 }
 
 // Per-driver pay basis (Driver.PayType).
@@ -279,4 +280,25 @@ public enum RateQuoteSource
     None,
     RouteStandard,
     Contract
+}
+
+// Vendor / Procurement (module 11).
+public enum VendorType
+{
+    PartsSupplier,
+    Workshop,
+    FuelStation,
+    Transporter,
+    Other
+}
+
+// User-set intent on a PO; PartiallyReceived / Received are also derived from
+// line receipts at read time (see PurchaseOrderMapper.EffectiveStatus).
+public enum PurchaseOrderStatus
+{
+    Draft,
+    Ordered,
+    PartiallyReceived,
+    Received,
+    Cancelled
 }

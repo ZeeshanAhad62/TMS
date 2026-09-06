@@ -1,0 +1,140 @@
+@page "/vendors"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Vendors - Procurement</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Vendors</h2>
+        <div class="text-muted small">Procurement &rsaquo; Vendor Master</div>
+    </div>
+    <a class="btn btn-primary" href="/vendors/new"><i class="bi bi-plus-lg me-1"></i>Add Vendor</a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Vendors</div><div class="stat-value">@(_vendors?.Count ?? 0)</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Active</div><div class="stat-value text-success">@(_vendors?.Count(v => v.IsActive) ?? 0)</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Open POs</div><div class="stat-value">@(_vendors?.Sum(v => v.OpenPurchaseOrderCount) ?? 0)</div>
+    </div></div></div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-5">
+            <input class="form-control" placeholder="Search code, name, contact, phone..." @bind="_search" @bind:event="oninput" @onkeyup="OnKey" />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="_type">
+                <option value="">All types</option>
+                @foreach (var t in Enum.GetValues<VendorType>())
+                {
+                    <option value="@t">@t.ToDisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" @bind="_activeOnly">
+                <option value="">All</option>
+                <option value="true">Active only</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="Load"><i class="bi bi-funnel me-1"></i>Apply</button>
+        </div>
+    </div>
+</div></div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_vendors is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_vendors.Count == 0)
+{
+    <div class="alert alert-info">No vendors found. Click "Add Vendor" to create the first one.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr><th>Code</th><th>Name</th><th>Type</th><th>Contact</th><th>Phone</th><th>Terms</th><th class="text-end">Open POs</th><th>Active</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var v in _vendors)
+                {
+                    <tr class="@(v.IsActive ? "" : "text-muted")">
+                        <td class="font-monospace">@v.VendorCode</td>
+                        <td>@v.Name</td>
+                        <td>@v.VendorType.ToDisplayName()</td>
+                        <td>@(string.IsNullOrWhiteSpace(v.ContactPerson) ? "—" : v.ContactPerson)</td>
+                        <td>@(string.IsNullOrWhiteSpace(v.Phone) ? "—" : v.Phone)</td>
+                        <td>@(v.PaymentTermsDays.HasValue ? $"{v.PaymentTermsDays}d" : "—")</td>
+                        <td class="text-end">@v.OpenPurchaseOrderCount</td>
+                        <td>@(v.IsActive ? "Yes" : "No")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/vendors/@v.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(v.Id)"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<VendorListItemDto>? _vendors;
+    private string _search = "";
+    private string _type = "";
+    private string _activeOnly = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            VendorType? type = Enum.TryParse<VendorType>(_type, out var t) ? t : null;
+            bool? active = _activeOnly == "true" ? true : null;
+            _vendors = await Api.GetVendorsAsync(type, active, _search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load vendors: {ex.Message}";
+            _vendors = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this vendor? Its purchase orders are deleted too (received stock stays).")) return;
+        try
+        {
+            await Api.DeleteVendorAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete vendor: {ex.Message}";
+        }
+    }
+}

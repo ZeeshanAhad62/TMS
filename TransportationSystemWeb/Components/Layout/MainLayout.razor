@@ -143,6 +143,18 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @((SubLinkClass("/vendors") == "active" || SubLinkClass("/purchase-orders") == "active") ? "active-module" : "")" title="Procurement">
+                    <i class="bi bi-bag-check"></i> <span class="nav-text">Procurement</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/vendors")" href="/vendors" title="Vendors">
+                    <i class="bi bi-shop"></i> <span class="nav-text">Vendors</span>
+                </a>
+                <a class="nav-sublink @SubLinkClass("/purchase-orders")" href="/purchase-orders" title="Purchase Orders">
+                    <i class="bi bi-receipt-cutoff"></i> <span class="nav-text">Purchase Orders</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/compliance") == "active" ? "active-module" : "")" title="Compliance">
                     <i class="bi bi-shield-check"></i> <span class="nav-text">Compliance</span>
                 </div>

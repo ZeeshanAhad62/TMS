@@ -133,8 +133,10 @@ public class PartsController : ControllerBase
         var movement = await _db.StockMovements.FirstOrDefaultAsync(m => m.Id == movementId && m.PartId == id);
         if (movement is null) return NotFound();
 
-        if (await _db.WorkOrderItems.AnyAsync(i => i.StockMovementId == movementId))
+        if (movement.ReferenceType == StockMovementReferenceType.WorkOrder)
             return BadRequest("This movement was created from a work order line; edit or delete that line instead.");
+        if (movement.ReferenceType == StockMovementReferenceType.PurchaseOrder)
+            return BadRequest("This movement is a goods receipt against a purchase order and cannot be deleted here.");
 
         _db.StockMovements.Remove(movement);
         await _db.SaveChangesAsync();

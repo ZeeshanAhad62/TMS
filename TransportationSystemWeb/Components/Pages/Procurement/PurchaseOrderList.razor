@@ -1,0 +1,166 @@
+@page "/purchase-orders"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Purchase Orders - Procurement</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Purchase Orders</h2>
+        <div class="text-muted small">Procurement &rsaquo; Purchase Orders</div>
+    </div>
+    <a class="btn btn-primary" href="/purchase-orders/new"><i class="bi bi-plus-lg me-1"></i>New PO</a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Purchase Orders</div><div class="stat-value">@(_orders?.Count ?? 0)</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Awaiting Receipt</div><div class="stat-value text-warning">@AwaitingCount</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Open Value</div><div class="stat-value">@OpenValue.ToString("N0")</div>
+    </div></div></div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-4">
+            <select class="form-select" @bind="_vendorId">
+                <option value="">All vendors</option>
+                @if (_vendors is not null)
+                {
+                    @foreach (var v in _vendors)
+                    {
+                        <option value="@v.Id">@v.VendorCode — @v.Name</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="_status">
+                <option value="">All statuses</option>
+                @foreach (var s in Enum.GetValues<PurchaseOrderStatus>())
+                {
+                    <option value="@s">@s.ToDisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <input class="form-control" placeholder="Search PO #, vendor..." @bind="_search" @bind:event="oninput" @onkeyup="OnKey" />
+        </div>
+        <div class="col-md-2 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="Load"><i class="bi bi-funnel me-1"></i>Apply</button>
+        </div>
+    </div>
+</div></div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_orders is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_orders.Count == 0)
+{
+    <div class="alert alert-info">No purchase orders found.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr><th>PO #</th><th>Vendor</th><th>Order Date</th><th>Expected</th><th>Status</th><th class="text-end">Total</th><th class="text-end">Received</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var po in _orders)
+                {
+                    <tr>
+                        <td class="font-monospace">@po.PoNumber</td>
+                        <td>@po.VendorName</td>
+                        <td>@po.OrderDate.ToString("dd-MMM-yy")</td>
+                        <td>@(po.ExpectedDate?.ToString("dd-MMM-yy") ?? "—")</td>
+                        <td><span class="badge @StatusClass(po.EffectiveStatus)">@po.EffectiveStatus.ToDisplayName()</span></td>
+                        <td class="text-end">@po.Total.ToString("N2")</td>
+                        <td class="text-end">@po.ReceivedPercent.ToString("0.#")%</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/purchase-orders/@po.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(po.Id)"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<PurchaseOrderListItemDto>? _orders;
+    private List<VendorListItemDto>? _vendors;
+    private string _vendorId = "";
+    private string _status = "";
+    private string _search = "";
+    private string? _error;
+
+    private int AwaitingCount => _orders?.Count(o =>
+        o.EffectiveStatus is PurchaseOrderStatus.Ordered or PurchaseOrderStatus.PartiallyReceived) ?? 0;
+    private decimal OpenValue => (_orders ?? new())
+        .Where(o => o.EffectiveStatus != PurchaseOrderStatus.Received && o.EffectiveStatus != PurchaseOrderStatus.Cancelled)
+        .Sum(o => o.Total);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _vendors = await Api.GetVendorsAsync(); } catch { _vendors = new(); }
+        await Load();
+    }
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            int? vid = int.TryParse(_vendorId, out var v) ? v : null;
+            PurchaseOrderStatus? status = Enum.TryParse<PurchaseOrderStatus>(_status, out var s) ? s : null;
+            _orders = await Api.GetPurchaseOrdersAsync(vid, status, _search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load purchase orders: {ex.Message}";
+            _orders = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this purchase order and its lines?")) return;
+        try
+        {
+            await Api.DeletePurchaseOrderAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete purchase order: {ex.Message}";
+        }
+    }
+
+    private static string StatusClass(PurchaseOrderStatus s) => s switch
+    {
+        PurchaseOrderStatus.Draft => "bg-secondary",
+        PurchaseOrderStatus.Ordered => "bg-primary",
+        PurchaseOrderStatus.PartiallyReceived => "bg-warning text-dark",
+        PurchaseOrderStatus.Received => "bg-success",
+        PurchaseOrderStatus.Cancelled => "bg-dark",
+        _ => "bg-light text-dark"
+    };
+}

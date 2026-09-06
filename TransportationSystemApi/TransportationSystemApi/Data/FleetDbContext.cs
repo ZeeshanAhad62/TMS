@@ -43,6 +43,9 @@ public class FleetDbContext : DbContext
     public DbSet<GeofenceEvent> GeofenceEvents => Set<GeofenceEvent>();
     public DbSet<RouteMaster> Routes => Set<RouteMaster>();
     public DbSet<RateContract> RateContracts => Set<RateContract>();
+    public DbSet<Vendor> Vendors => Set<Vendor>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -414,6 +417,40 @@ public class FleetDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(c => c.CustomerId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Vendor>(entity =>
+        {
+            entity.HasIndex(v => v.VendorCode).IsUnique();
+            entity.HasIndex(v => v.VendorType);
+
+            entity.HasMany(v => v.PurchaseOrders)
+                .WithOne(p => p.Vendor)
+                .HasForeignKey(p => p.VendorId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PurchaseOrder>(entity =>
+        {
+            entity.HasIndex(p => p.PoNumber).IsUnique();
+            entity.Property(p => p.TaxPercent).HasPrecision(9, 4);
+
+            entity.HasMany(p => p.Lines)
+                .WithOne(l => l.PurchaseOrder)
+                .HasForeignKey(l => l.PurchaseOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PurchaseOrderLine>(entity =>
+        {
+            entity.Property(l => l.Quantity).HasPrecision(18, 2);
+            entity.Property(l => l.UnitPrice).HasPrecision(18, 2);
+            entity.Property(l => l.QuantityReceived).HasPrecision(18, 2);
+
+            entity.HasOne(l => l.Part)
+                .WithMany()
+                .HasForeignKey(l => l.PartId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }
