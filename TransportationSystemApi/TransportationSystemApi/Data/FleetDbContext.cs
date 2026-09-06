@@ -47,6 +47,9 @@ public class FleetDbContext : DbContext
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
     public DbSet<Consignment> Consignments => Set<Consignment>();
+    public DbSet<Incident> Incidents => Set<Incident>();
+    public DbSet<InsuranceClaim> InsuranceClaims => Set<InsuranceClaim>();
+    public DbSet<IncidentPhoto> IncidentPhotos => Set<IncidentPhoto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -468,6 +471,46 @@ public class FleetDbContext : DbContext
             entity.Property(c => c.WeightKg).HasPrecision(18, 2);
             entity.Property(c => c.DeclaredValue).HasPrecision(18, 2);
             entity.Property(c => c.FreightAmount).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<Incident>(entity =>
+        {
+            entity.HasIndex(i => i.IncidentCode).IsUnique();
+            entity.HasIndex(i => i.VehicleId);
+            entity.HasIndex(i => i.DriverId);
+            entity.HasIndex(i => i.Status);
+            entity.Property(i => i.Latitude).HasPrecision(9, 6);
+            entity.Property(i => i.Longitude).HasPrecision(9, 6);
+            entity.Property(i => i.EstimatedRepairCost).HasPrecision(18, 2);
+
+            entity.HasOne(i => i.Vehicle)
+                .WithMany()
+                .HasForeignKey(i => i.VehicleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(i => i.Driver)
+                .WithMany()
+                .HasForeignKey(i => i.DriverId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasMany(i => i.Claims)
+                .WithOne(c => c.Incident)
+                .HasForeignKey(c => c.IncidentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(i => i.Photos)
+                .WithOne(p => p.Incident)
+                .HasForeignKey(p => p.IncidentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InsuranceClaim>(entity =>
+        {
+            entity.HasIndex(c => c.ClaimCode).IsUnique();
+            entity.Property(c => c.AmountClaimed).HasPrecision(18, 2);
+            entity.Property(c => c.AmountApproved).HasPrecision(18, 2);
+            entity.Property(c => c.AmountReceived).HasPrecision(18, 2);
+            entity.Property(c => c.Deductible).HasPrecision(18, 2);
         });
     }
 }

@@ -191,6 +191,15 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @(SubLinkClass("/incidents") == "active" ? "active-module" : "")" title="Incidents &amp; Claims">
+                    <i class="bi bi-exclamation-octagon"></i> <span class="nav-text">Incidents &amp; Claims</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/incidents")" href="/incidents" title="Incident Register">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Incident Register</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/reports") == "active" ? "active-module" : "")" title="Reports &amp; Analytics">
                     <i class="bi bi-bar-chart"></i> <span class="nav-text">Reports &amp; Analytics</span>
                 </div>

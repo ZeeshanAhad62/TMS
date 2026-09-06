@@ -1205,6 +1205,97 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Incidents & Insurance Claims (module 14) -----
+
+    public async Task<List<IncidentListItemDto>> GetIncidentsAsync(
+        int? vehicleId = null, int? driverId = null, IncidentStatus? status = null,
+        IncidentSeverity? severity = null, IncidentType? type = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var q = new List<string>();
+        if (vehicleId.HasValue) q.Add($"vehicleId={vehicleId}");
+        if (driverId.HasValue) q.Add($"driverId={driverId}");
+        if (status.HasValue) q.Add($"status={status}");
+        if (severity.HasValue) q.Add($"severity={severity}");
+        if (type.HasValue) q.Add($"type={type}");
+        if (!string.IsNullOrWhiteSpace(search)) q.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = q.Count > 0 ? "?" + string.Join("&", q) : "";
+        return await _http.GetFromJsonAsync<List<IncidentListItemDto>>($"api/incidents{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<IncidentDetailDto?> GetIncidentAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/incidents/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<IncidentDetailDto>(JsonOptions);
+    }
+
+    public async Task<IncidentDetailDto> CreateIncidentAsync(IncidentUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/incidents", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<IncidentDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateIncidentAsync(int id, IncidentUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/incidents/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteIncidentAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/incidents/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<IncidentPhotoDto> UploadIncidentPhotoAsync(int id, string fileName, string contentType, Stream content, string? caption)
+    {
+        await AuthorizeAsync();
+        using var form = new MultipartFormDataContent();
+        using var streamContent = new StreamContent(content);
+        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        form.Add(streamContent, "file", fileName);
+        if (!string.IsNullOrWhiteSpace(caption)) form.Add(new StringContent(caption), "caption");
+
+        var response = await _http.PostAsync($"api/incidents/{id}/photos", form);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<IncidentPhotoDto>(JsonOptions))!;
+    }
+
+    public async Task DeleteIncidentPhotoAsync(int id, int photoId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/incidents/{id}/photos/{photoId}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<InsuranceClaimDto> CreateInsuranceClaimAsync(int incidentId, InsuranceClaimUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/incidents/{incidentId}/claims", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<InsuranceClaimDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateInsuranceClaimAsync(int incidentId, int claimId, InsuranceClaimUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/incidents/{incidentId}/claims/{claimId}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteInsuranceClaimAsync(int incidentId, int claimId)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/incidents/{incidentId}/claims/{claimId}");
+        await EnsureSuccess(response);
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

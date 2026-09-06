@@ -26,6 +26,7 @@
         <a class="btn btn-outline-primary btn-sm" href="/routes"><i class="bi bi-signpost-split me-1"></i>Routes</a>
         <a class="btn btn-outline-primary btn-sm" href="/purchase-orders"><i class="bi bi-bag-check me-1"></i>Procurement</a>
         <a class="btn btn-outline-primary btn-sm" href="/consignments"><i class="bi bi-box2 me-1"></i>Consignments</a>
+        <a class="btn btn-outline-primary btn-sm" href="/incidents"><i class="bi bi-exclamation-octagon me-1"></i>Incidents</a>
     </div>
 </div>
 
@@ -1069,6 +1070,53 @@ else
             </div>
         </div>
     }
+
+    @if (_incidents is not null)
+    {
+        <div class="row g-3 mt-1">
+            <div class="col-lg-8">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Open Incidents</div>
+                                <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-exclamation-octagon"></i></div>
+                            </div>
+                            <div class="stat-value text-warning">@_incidents.Count(i => i.Status != IncidentStatus.Closed)</div>
+                            <div class="stat-sub text-muted">Not yet closed</div>
+                        </div></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Major / Total Loss</div>
+                                <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-cone-striped"></i></div>
+                            </div>
+                            <div class="stat-value text-danger">@_incidents.Count(i => i.Severity is IncidentSeverity.Major or IncidentSeverity.TotalLoss)</div>
+                            <div class="stat-sub text-muted">All time</div>
+                        </div></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Claims Outstanding</div>
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-cash-coin"></i></div>
+                            </div>
+                            <div class="stat-value">@_incidents.Sum(i => i.ClaimsOutstanding).ToString("N0")</div>
+                            <div class="stat-sub text-muted">Expected from insurers</div>
+                        </div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100"><div class="card-body d-flex flex-column">
+                    <h6 class="mb-2">Incidents &amp; Claims</h6>
+                    <div class="text-muted small mb-3">Log accidents, theft and damage with photos, then track insurance claims from submission to settlement.</div>
+                    <a class="btn btn-outline-primary btn-sm mt-auto align-self-start" href="/incidents"><i class="bi bi-exclamation-octagon me-1"></i>Incident Register</a>
+                </div></div>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -1090,6 +1138,7 @@ else
     private List<VendorListItemDto>? _vendors;
     private List<PurchaseOrderListItemDto>? _purchaseOrders;
     private List<ConsignmentListItemDto>? _consignments;
+    private List<IncidentListItemDto>? _incidents;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -1115,6 +1164,7 @@ else
             _vendors = await Api.GetVendorsAsync();
             _purchaseOrders = await Api.GetPurchaseOrdersAsync();
             _consignments = await Api.GetConsignmentsAsync();
+            _incidents = await Api.GetIncidentsAsync();
         }
         catch (Exception ex)
         {

@@ -1,0 +1,508 @@
+@page "/incidents/new"
+@page "/incidents/{Id:int}/edit"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>@(IsNew ? "Report Incident" : "Edit Incident") - Incidents &amp; Claims</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">
+            @if (IsNew)
+            {
+                <text>Report Incident</text>
+            }
+            else
+            {
+                <span class="font-monospace">@_detail?.IncidentCode</span>
+                <text> &mdash; @_detail?.VehicleCode</text>
+                @if (_detail is not null)
+                {
+                    <span class="badge @SeverityClass(_detail.Severity) ms-2">@_detail.Severity.ToDisplayName()</span>
+                }
+            }
+        </h2>
+        <div class="text-muted small">Safety &rsaquo; Accident / Incident register</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="/incidents"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+@if (_message is not null)
+{
+    <div class="alert alert-success">@_message</div>
+}
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    @if (!IsNew && _detail is not null)
+    {
+        <ul class="nav nav-tabs mb-3">
+            @foreach (var tab in Tabs)
+            {
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(_activeTab == tab ? "active" : "")" @onclick="() => _activeTab = tab">@tab</button>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (_activeTab == "Details")
+    {
+        <EditForm Model="_model" OnValidSubmit="Save">
+            <DataAnnotationsValidator />
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Incident Details</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Vehicle *</label>
+                        <InputSelect class="form-select" @bind-Value="_model.VehicleId">
+                            <option value="0">Select a vehicle...</option>
+                            @foreach (var v in _vehicles)
+                            {
+                                <option value="@v.Id">@v.VehicleCode &mdash; @v.RegistrationNumber</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Driver</label>
+                        <InputSelect class="form-select" @bind-Value="_model.DriverId">
+                            <option value="">— unknown / none —</option>
+                            @foreach (var d in _drivers)
+                            {
+                                <option value="@d.Id">@d.DriverCode &mdash; @d.FullName</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Trip (optional)</label>
+                        <InputSelect class="form-select" @bind-Value="_model.TripId">
+                            <option value="">— not on a trip —</option>
+                            @foreach (var t in _trips)
+                            {
+                                <option value="@t.Id">@t.TripCode &mdash; @t.Origin → @t.Destination</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Occurred at *</label>
+                        <input type="datetime-local" class="form-control" @bind="_occurredLocal" />
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Location</label>
+                        <InputText class="form-control" @bind-Value="_model.Location" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Latitude</label>
+                        <InputNumber class="form-control" @bind-Value="_model.Latitude" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Longitude</label>
+                        <InputNumber class="form-control" @bind-Value="_model.Longitude" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Type</label>
+                        <InputSelect class="form-select" @bind-Value="_model.IncidentType">
+                            @foreach (var t in Enum.GetValues<IncidentType>())
+                            {
+                                <option value="@t">@t.ToDisplayName()</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Severity</label>
+                        <InputSelect class="form-select" @bind-Value="_model.Severity">
+                            @foreach (var s in Enum.GetValues<IncidentSeverity>())
+                            {
+                                <option value="@s">@s.ToDisplayName()</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <InputSelect class="form-select" @bind-Value="_model.Status">
+                            @foreach (var s in Enum.GetValues<IncidentStatus>())
+                            {
+                                <option value="@s">@s.ToDisplayName()</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Est. repair cost</label>
+                        <InputNumber class="form-control" @bind-Value="_model.EstimatedRepairCost" />
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Description</label>
+                        <InputTextArea class="form-control" rows="3" @bind-Value="_model.Description" />
+                    </div>
+
+                    <div class="col-md-3 d-flex align-items-end">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="tp" @bind="_model.ThirdPartyInvolved" />
+                            <label class="form-check-label" for="tp">Third party involved</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Third-party details</label>
+                        <InputText class="form-control" @bind-Value="_model.ThirdPartyDetails" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Police report #</label>
+                        <InputText class="form-control" @bind-Value="_model.PoliceReportNumber" />
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Notes</label>
+                        <InputTextArea class="form-control" rows="2" @bind-Value="_model.Notes" />
+                    </div>
+                </div>
+            </div></div>
+
+            <div class="mt-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@(IsNew ? "Report Incident" : "Save Changes")</button>
+                <a class="btn btn-outline-secondary" href="/incidents">Cancel</a>
+            </div>
+        </EditForm>
+    }
+    else if (_activeTab == "Photos" && _detail is not null)
+    {
+        <div class="card"><div class="card-body">
+            <h5 class="card-title">Photos</h5>
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-5">
+                    <label class="form-label">Caption (optional)</label>
+                    <input class="form-control" @bind="_photoCaption" placeholder="Front bumper damage" />
+                </div>
+                <div class="col-md-7">
+                    <label class="form-label">File (PDF/JPG/PNG, max 10 MB)</label>
+                    <InputFile OnChange="UploadPhoto" class="form-control" accept=".pdf,.jpg,.jpeg,.png" />
+                </div>
+            </div>
+            @if (_detail.Photos.Count == 0)
+            {
+                <div class="text-muted small">No photos uploaded yet.</div>
+            }
+            else
+            {
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>File</th><th>Caption</th><th class="text-end">Size</th><th>Uploaded</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var p in _detail.Photos)
+                    {
+                        <tr>
+                            <td><a href="@p.DownloadUrl" target="_blank">@p.FileName</a></td>
+                            <td>@(string.IsNullOrWhiteSpace(p.Caption) ? "—" : p.Caption)</td>
+                            <td class="text-end">@(p.FileSizeBytes / 1024) KB</td>
+                            <td class="small">@p.UploadedAt.ToLocalTime().ToString("dd-MMM-yy HH:mm")</td>
+                            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeletePhoto(p.Id)"><i class="bi bi-trash"></i></button></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div></div>
+    }
+    else if (_activeTab == "Insurance Claims" && _detail is not null)
+    {
+        <div class="card mb-3"><div class="card-body">
+            <div class="row g-3 text-center">
+                <div class="col"><div class="stat-label">Claimed</div><div class="fw-semibold">@_detail.TotalClaimed.ToString("N2")</div></div>
+                <div class="col"><div class="stat-label">Approved</div><div class="fw-semibold">@_detail.TotalApproved.ToString("N2")</div></div>
+                <div class="col"><div class="stat-label">Received</div><div class="fw-semibold">@_detail.TotalReceived.ToString("N2")</div></div>
+                <div class="col"><div class="stat-label">Outstanding</div><div class="fw-semibold @(_detail.ClaimsOutstanding > 0 ? "text-danger" : "text-success")">@_detail.ClaimsOutstanding.ToString("N2")</div></div>
+            </div>
+        </div></div>
+
+        @foreach (var c in _detail.Claims)
+        {
+            var e = _claimEdits[c.Id];
+            <div class="card mb-2"><div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <h6 class="mb-2"><span class="font-monospace">@c.ClaimCode</span></h6>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveClaim(c.Id)"><i class="bi bi-check-lg"></i> Save</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteClaim(c.Id)"><i class="bi bi-trash"></i></button>
+                    </div>
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-3"><label class="form-label">Insurer</label><input class="form-control form-control-sm" @bind="e.InsurerName" /></div>
+                    <div class="col-md-2"><label class="form-label">Policy #</label><input class="form-control form-control-sm" @bind="e.PolicyNumber" /></div>
+                    <div class="col-md-2"><label class="form-label">Claim #</label><input class="form-control form-control-sm" @bind="e.ClaimNumber" /></div>
+                    <div class="col-md-2"><label class="form-label">Claim date</label><input type="date" class="form-control form-control-sm" @bind="e.ClaimDate" /></div>
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select form-select-sm" @bind="e.Status">
+                            @foreach (var s in Enum.GetValues<InsuranceClaimStatus>())
+                            {
+                                <option value="@s">@s.ToDisplayName()</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2"><label class="form-label">Claimed</label><input type="number" step="0.01" class="form-control form-control-sm" @bind="e.AmountClaimed" /></div>
+                    <div class="col-md-2"><label class="form-label">Approved</label><input type="number" step="0.01" class="form-control form-control-sm" @bind="e.AmountApproved" /></div>
+                    <div class="col-md-2"><label class="form-label">Received</label><input type="number" step="0.01" class="form-control form-control-sm" @bind="e.AmountReceived" /></div>
+                    <div class="col-md-2"><label class="form-label">Deductible</label><input type="number" step="0.01" class="form-control form-control-sm" @bind="e.Deductible" /></div>
+                    <div class="col-md-2"><label class="form-label">Settled date</label><input type="date" class="form-control form-control-sm" @bind="e.SettledDate" /></div>
+                    <div class="col-md-2 d-flex align-items-end"><span class="small text-muted">Outstanding: <strong>@c.Outstanding.ToString("N2")</strong></span></div>
+                    <div class="col-md-12"><label class="form-label">Notes</label><input class="form-control form-control-sm" @bind="e.Notes" /></div>
+                </div>
+            </div></div>
+        }
+
+        <div class="card"><div class="card-body">
+            <h6 class="mb-2">Add a claim</h6>
+            <div class="row g-2">
+                <div class="col-md-3"><label class="form-label">Insurer</label><input class="form-control form-control-sm" @bind="_newClaim.InsurerName" /></div>
+                <div class="col-md-2"><label class="form-label">Policy #</label><input class="form-control form-control-sm" @bind="_newClaim.PolicyNumber" /></div>
+                <div class="col-md-2"><label class="form-label">Claim date</label><input type="date" class="form-control form-control-sm" @bind="_newClaim.ClaimDate" /></div>
+                <div class="col-md-2"><label class="form-label">Amount claimed</label><input type="number" step="0.01" class="form-control form-control-sm" @bind="_newClaim.AmountClaimed" /></div>
+                <div class="col-md-3 d-grid align-items-end"><button type="button" class="btn btn-primary btn-sm" @onclick="AddClaim"><i class="bi bi-plus-lg me-1"></i>Add claim</button></div>
+            </div>
+        </div></div>
+    }
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    [SupplyParameterFromQuery] public int? VehicleId { get; set; }
+    [SupplyParameterFromQuery] public int? TripId { get; set; }
+
+    private bool IsNew => Id is null;
+    private static readonly string[] Tabs = { "Details", "Photos", "Insurance Claims" };
+    private string _activeTab = "Details";
+
+    private bool _loading = true;
+    private string? _error;
+    private string? _message;
+
+    private IncidentUpsertDto _model = New();
+    private IncidentDetailDto? _detail;
+    private DateTime _occurredLocal = DateTime.Now;
+
+    private List<VehicleListItemDto> _vehicles = new();
+    private List<DriverListItemDto> _drivers = new();
+    private List<TripListItemDto> _trips = new();
+
+    private string _photoCaption = "";
+    private InsuranceClaimUpsertDto _newClaim = NewClaim();
+    private Dictionary<int, InsuranceClaimUpsertDto> _claimEdits = new();
+
+    private static IncidentUpsertDto New() => new()
+    {
+        OccurredAt = DateTime.UtcNow,
+        IncidentType = IncidentType.Collision,
+        Severity = IncidentSeverity.Minor,
+        Status = IncidentStatus.Reported
+    };
+
+    private static InsuranceClaimUpsertDto NewClaim() => new()
+    {
+        ClaimDate = DateOnly.FromDateTime(DateTime.Today),
+        Status = InsuranceClaimStatus.Draft
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _activeTab = "Details";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _vehicles = await Api.GetVehiclesAsync();
+            _drivers = await Api.GetDriversAsync();
+            _trips = await Api.GetTripsAsync();
+
+            if (Id.HasValue)
+            {
+                _detail = await Api.GetIncidentAsync(Id.Value);
+                if (_detail is null) { _error = "Incident not found."; }
+                else
+                {
+                    _model = new IncidentUpsertDto
+                    {
+                        VehicleId = _detail.VehicleId,
+                        DriverId = _detail.DriverId,
+                        TripId = _detail.TripId,
+                        OccurredAt = _detail.OccurredAt,
+                        Location = _detail.Location,
+                        Latitude = _detail.Latitude,
+                        Longitude = _detail.Longitude,
+                        IncidentType = _detail.IncidentType,
+                        Severity = _detail.Severity,
+                        Status = _detail.Status,
+                        Description = _detail.Description,
+                        ThirdPartyInvolved = _detail.ThirdPartyInvolved,
+                        ThirdPartyDetails = _detail.ThirdPartyDetails,
+                        PoliceReportNumber = _detail.PoliceReportNumber,
+                        EstimatedRepairCost = _detail.EstimatedRepairCost,
+                        Notes = _detail.Notes
+                    };
+                    _occurredLocal = _detail.OccurredAt.ToLocalTime();
+                    _claimEdits = _detail.Claims.ToDictionary(c => c.Id, c => new InsuranceClaimUpsertDto
+                    {
+                        InsurerName = c.InsurerName, PolicyNumber = c.PolicyNumber, ClaimNumber = c.ClaimNumber,
+                        ClaimDate = c.ClaimDate, AmountClaimed = c.AmountClaimed, AmountApproved = c.AmountApproved,
+                        AmountReceived = c.AmountReceived, Deductible = c.Deductible, Status = c.Status,
+                        SettledDate = c.SettledDate, Notes = c.Notes
+                    });
+                }
+            }
+            else
+            {
+                _detail = null;
+                _model = New();
+                _occurredLocal = DateTime.Now;
+                if (VehicleId.HasValue) _model.VehicleId = VehicleId.Value;
+                if (TripId.HasValue) _model.TripId = TripId.Value;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load incident: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        _error = null;
+        _message = null;
+        if (_model.VehicleId == 0)
+        {
+            _error = "Select the vehicle involved.";
+            return;
+        }
+        _model.OccurredAt = _occurredLocal.ToUniversalTime();
+        try
+        {
+            if (IsNew)
+            {
+                var created = await Api.CreateIncidentAsync(_model);
+                Nav.NavigateTo($"/incidents/{created.Id}/edit");
+            }
+            else
+            {
+                await Api.UpdateIncidentAsync(Id!.Value, _model);
+                _message = "Changes saved.";
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save incident: {ex.Message}";
+        }
+    }
+
+    private async Task UploadPhoto(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        if (_detail is null) return;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
+            await Api.UploadIncidentPhotoAsync(_detail.Id, e.File.Name, e.File.ContentType, stream, _photoCaption);
+            _photoCaption = "";
+            _activeTab = "Photos";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to upload photo: {ex.Message}";
+        }
+    }
+
+    private async Task DeletePhoto(int photoId)
+    {
+        _error = null;
+        if (_detail is null) return;
+        try
+        {
+            await Api.DeleteIncidentPhotoAsync(_detail.Id, photoId);
+            _activeTab = "Photos";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete photo: {ex.Message}";
+        }
+    }
+
+    private async Task AddClaim()
+    {
+        _error = null;
+        if (_detail is null) return;
+        try
+        {
+            await Api.CreateInsuranceClaimAsync(_detail.Id, _newClaim);
+            _newClaim = NewClaim();
+            _activeTab = "Insurance Claims";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add claim: {ex.Message}";
+        }
+    }
+
+    private async Task SaveClaim(int claimId)
+    {
+        _error = null;
+        if (_detail is null) return;
+        try
+        {
+            await Api.UpdateInsuranceClaimAsync(_detail.Id, claimId, _claimEdits[claimId]);
+            _message = "Claim saved.";
+            _activeTab = "Insurance Claims";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save claim: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteClaim(int claimId)
+    {
+        _error = null;
+        if (_detail is null) return;
+        try
+        {
+            await Api.DeleteInsuranceClaimAsync(_detail.Id, claimId);
+            _activeTab = "Insurance Claims";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete claim: {ex.Message}";
+        }
+    }
+
+    private static string SeverityClass(IncidentSeverity s) => s switch
+    {
+        IncidentSeverity.Minor => "bg-secondary",
+        IncidentSeverity.Moderate => "bg-warning text-dark",
+        IncidentSeverity.Major => "bg-danger",
+        IncidentSeverity.TotalLoss => "bg-dark",
+        _ => "bg-light text-dark"
+    };
+}

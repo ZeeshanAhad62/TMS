@@ -320,3 +320,43 @@ public enum FreightTerms
     ToPay,     // collected from the consignee on delivery
     Billed     // added to the customer's account / invoice
 }
+
+// Accident / Incident & Insurance Claims (module 14).
+public enum IncidentType
+{
+    Collision,
+    Rollover,
+    Theft,
+    FireDamage,
+    Vandalism,
+    NaturalDisaster,
+    Breakdown,
+    Other
+}
+
+public enum IncidentSeverity
+{
+    Minor,
+    Moderate,
+    Major,
+    TotalLoss
+}
+
+public enum IncidentStatus
+{
+    Reported,
+    UnderInvestigation,
+    RepairInProgress,
+    Closed
+}
+
+public enum InsuranceClaimStatus
+{
+    Draft,
+    Submitted,
+    UnderReview,
+    Approved,
+    PartiallyApproved,
+    Rejected,
+    Settled
+}

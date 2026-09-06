@@ -1,0 +1,168 @@
+@page "/incidents"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Incidents &amp; Claims</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Incidents &amp; Claims</h2>
+        <div class="text-muted small">Safety &rsaquo; Accident / Incident register</div>
+    </div>
+    <a class="btn btn-primary" href="/incidents/new"><i class="bi bi-plus-lg me-1"></i>Report Incident</a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Incidents</div><div class="stat-value">@(_items?.Count ?? 0)</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Open</div><div class="stat-value text-warning">@OpenCount</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Total / Major</div><div class="stat-value text-danger">@SevereCount</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Claims Outstanding</div><div class="stat-value">@ClaimsOutstanding.ToString("N0")</div>
+    </div></div></div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-5">
+            <input class="form-control" placeholder="Search code, location, police #, reg..." @bind="_search" @bind:event="oninput" @onkeyup="OnKey" />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="_status">
+                <option value="">All statuses</option>
+                @foreach (var s in Enum.GetValues<IncidentStatus>())
+                {
+                    <option value="@s">@s.ToDisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" @bind="_severity">
+                <option value="">Any severity</option>
+                @foreach (var s in Enum.GetValues<IncidentSeverity>())
+                {
+                    <option value="@s">@s.ToDisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="Load"><i class="bi bi-funnel me-1"></i>Apply</button>
+        </div>
+    </div>
+</div></div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_items is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_items.Count == 0)
+{
+    <div class="alert alert-info">No incidents recorded.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr><th>Code</th><th>When</th><th>Vehicle</th><th>Driver</th><th>Type</th><th>Severity</th><th>Status</th><th class="text-end">Claims O/S</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var i in _items)
+                {
+                    <tr>
+                        <td class="font-monospace">@i.IncidentCode</td>
+                        <td>@i.OccurredAt.ToLocalTime().ToString("dd-MMM-yy HH:mm")</td>
+                        <td>@i.VehicleCode<div class="text-muted small">@i.VehicleRegistrationNumber</div></td>
+                        <td>@(string.IsNullOrWhiteSpace(i.DriverName) ? "—" : i.DriverName)</td>
+                        <td>@i.IncidentType.ToDisplayName()</td>
+                        <td><span class="badge @SeverityClass(i.Severity)">@i.Severity.ToDisplayName()</span></td>
+                        <td><span class="badge @StatusClass(i.Status)">@i.Status.ToDisplayName()</span></td>
+                        <td class="text-end">@(i.ClaimsOutstanding > 0 ? i.ClaimsOutstanding.ToString("N0") : "—")<div class="text-muted small">@i.ClaimCount claim@(i.ClaimCount == 1 ? "" : "s") · @i.PhotoCount 📷</div></td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/incidents/@i.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(i.Id)"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<IncidentListItemDto>? _items;
+    private string _search = "";
+    private string _status = "";
+    private string _severity = "";
+    private string? _error;
+
+    private int OpenCount => _items?.Count(i => i.Status != IncidentStatus.Closed) ?? 0;
+    private int SevereCount => _items?.Count(i => i.Severity is IncidentSeverity.Major or IncidentSeverity.TotalLoss) ?? 0;
+    private decimal ClaimsOutstanding => (_items ?? new()).Sum(i => i.ClaimsOutstanding);
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            IncidentStatus? status = Enum.TryParse<IncidentStatus>(_status, out var s) ? s : null;
+            IncidentSeverity? sev = Enum.TryParse<IncidentSeverity>(_severity, out var v) ? v : null;
+            _items = await Api.GetIncidentsAsync(status: status, severity: sev, search: _search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load incidents: {ex.Message}";
+            _items = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this incident, its claims and photos? This cannot be undone.")) return;
+        try
+        {
+            await Api.DeleteIncidentAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete incident: {ex.Message}";
+        }
+    }
+
+    private static string SeverityClass(IncidentSeverity s) => s switch
+    {
+        IncidentSeverity.Minor => "bg-secondary",
+        IncidentSeverity.Moderate => "bg-warning text-dark",
+        IncidentSeverity.Major => "bg-danger",
+        IncidentSeverity.TotalLoss => "bg-dark",
+        _ => "bg-light text-dark"
+    };
+
+    private static string StatusClass(IncidentStatus s) => s switch
+    {
+        IncidentStatus.Reported => "bg-primary",
+        IncidentStatus.UnderInvestigation => "bg-warning text-dark",
+        IncidentStatus.RepairInProgress => "bg-info text-dark",
+        IncidentStatus.Closed => "bg-success",
+        _ => "bg-light text-dark"
+    };
+}
