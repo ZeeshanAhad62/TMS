@@ -40,7 +40,10 @@ public class TripDetailDto : TripUpsertDto
     public decimal DriverPay { get; set; }
     public decimal NetProfit { get; set; }
 
+    public int ConsignmentCount { get; set; }
+
     public List<TripExpenseDto> Expenses { get; set; } = new();
+    public List<ConsignmentListItemDto> Consignments { get; set; } = new();
 }
 
 public class TripExpenseDto

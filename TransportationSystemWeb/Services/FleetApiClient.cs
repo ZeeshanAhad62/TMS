@@ -1133,6 +1133,78 @@ public class FleetApiClient
         return (await response.Content.ReadFromJsonAsync<ReceiveGoodsResultDto>(JsonOptions))!;
     }
 
+    // ----- Consignments / LR / POD (module 12) -----
+
+    public async Task<List<ConsignmentListItemDto>> GetConsignmentsAsync(
+        int? tripId = null, ConsignmentStatus? status = null, bool? pendingPodOnly = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (tripId.HasValue) query.Add($"tripId={tripId}");
+        if (status.HasValue) query.Add($"status={status}");
+        if (pendingPodOnly == true) query.Add("pendingPodOnly=true");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+        return await _http.GetFromJsonAsync<List<ConsignmentListItemDto>>($"api/consignments{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<ConsignmentDetailDto?> GetConsignmentAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/consignments/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<ConsignmentDetailDto>(JsonOptions);
+    }
+
+    public async Task<ConsignmentDetailDto> CreateConsignmentAsync(ConsignmentUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/consignments", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<ConsignmentDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateConsignmentAsync(int id, ConsignmentUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/consignments/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteConsignmentAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/consignments/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeliverConsignmentAsync(int id, DeliverConsignmentDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync($"api/consignments/{id}/deliver", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task<ConsignmentDetailDto> UploadConsignmentPodAsync(int id, string fileName, string contentType, Stream content)
+    {
+        await AuthorizeAsync();
+        using var form = new MultipartFormDataContent();
+        using var streamContent = new StreamContent(content);
+        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        form.Add(streamContent, "file", fileName);
+
+        var response = await _http.PostAsync($"api/consignments/{id}/pod", form);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<ConsignmentDetailDto>(JsonOptions))!;
+    }
+
+    public async Task DeleteConsignmentPodAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/consignments/{id}/pod");
+        await EnsureSuccess(response);
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

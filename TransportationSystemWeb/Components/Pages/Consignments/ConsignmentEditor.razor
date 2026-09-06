@@ -1,0 +1,400 @@
+@page "/consignments/new"
+@page "/consignments/{Id:int}/edit"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>@(IsNew ? "New Consignment" : "Edit Consignment") - LR / POD</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">
+            @if (IsNew)
+            {
+                <text>New Consignment</text>
+            }
+            else
+            {
+                <span class="font-monospace">@_detail?.ConsignmentCode</span>
+                <text> &mdash; @_model.ConsignorName → @_model.ConsigneeName</text>
+                @if (_detail is not null)
+                {
+                    <span class="badge @StatusClass(_detail.Status) ms-2">@_detail.Status.ToDisplayName()</span>
+                }
+            }
+        </h2>
+        <div class="text-muted small">Consignments &rsaquo; LR / POD</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="/consignments"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+@if (_message is not null)
+{
+    <div class="alert alert-success">@_message</div>
+}
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm Model="_model" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+
+        <div class="card mb-3"><div class="card-body">
+            <h5 class="card-title">Booking</h5>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Consignment Code</label>
+                    <input class="form-control" value="@(IsNew ? "(auto on save)" : _detail?.ConsignmentCode)" disabled />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">LR Number</label>
+                    <InputText class="form-control" @bind-Value="_model.LrNumber" placeholder="Paper LR / GR no." />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Booking Date *</label>
+                    <InputDate class="form-control" @bind-Value="_model.BookingDate" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Status</label>
+                    <InputSelect class="form-select" @bind-Value="_model.Status">
+                        @foreach (var s in Enum.GetValues<ConsignmentStatus>())
+                        {
+                            <option value="@s">@s.ToDisplayName()</option>
+                        }
+                    </InputSelect>
+                    <div class="form-text">Use the Delivery panel below to record a POD.</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Trip *</label>
+                    <InputSelect class="form-select" @bind-Value="_model.TripId" disabled="@(!IsNew)">
+                        <option value="0">Select a trip...</option>
+                        @foreach (var t in _trips)
+                        {
+                            <option value="@t.Id">@t.TripCode — @t.Origin → @t.Destination</option>
+                        }
+                    </InputSelect>
+                    @if (!IsNew)
+                    {
+                        <div class="form-text">Trip is fixed once the consignment exists.</div>
+                    }
+                </div>
+            </div>
+        </div></div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card h-100"><div class="card-body">
+                    <h5 class="card-title">Consignor (from)</h5>
+                    <div class="mb-2">
+                        <label class="form-label">Name *</label>
+                        <InputText class="form-control" @bind-Value="_model.ConsignorName" />
+                        <ValidationMessage For="() => _model.ConsignorName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Phone</label>
+                        <InputText class="form-control" @bind-Value="_model.ConsignorPhone" />
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label">Address</label>
+                        <InputTextArea class="form-control" rows="2" @bind-Value="_model.ConsignorAddress" />
+                    </div>
+                </div></div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100"><div class="card-body">
+                    <h5 class="card-title">Consignee (to)</h5>
+                    <div class="mb-2">
+                        <label class="form-label">Name *</label>
+                        <InputText class="form-control" @bind-Value="_model.ConsigneeName" />
+                        <ValidationMessage For="() => _model.ConsigneeName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Phone</label>
+                        <InputText class="form-control" @bind-Value="_model.ConsigneePhone" />
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label">Address</label>
+                        <InputTextArea class="form-control" rows="2" @bind-Value="_model.ConsigneeAddress" />
+                    </div>
+                </div></div>
+            </div>
+        </div>
+
+        <div class="card my-3"><div class="card-body">
+            <h5 class="card-title">Goods &amp; Freight</h5>
+            <div class="row g-3">
+                <div class="col-md-12">
+                    <label class="form-label">Goods Description</label>
+                    <InputTextArea class="form-control" rows="2" @bind-Value="_model.GoodsDescription" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Packages</label>
+                    <InputNumber class="form-control" @bind-Value="_model.Packages" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Weight (kg)</label>
+                    <InputNumber class="form-control" @bind-Value="_model.WeightKg" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Declared Value</label>
+                    <InputNumber class="form-control" @bind-Value="_model.DeclaredValue" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Freight Amount</label>
+                    <InputNumber class="form-control" @bind-Value="_model.FreightAmount" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Freight Terms</label>
+                    <InputSelect class="form-select" @bind-Value="_model.FreightTerms">
+                        @foreach (var f in Enum.GetValues<FreightTerms>())
+                        {
+                            <option value="@f">@f.ToDisplayName()</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+        </div></div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@(IsNew ? "Create Consignment" : "Save Changes")</button>
+            <a class="btn btn-outline-secondary" href="/consignments">Cancel</a>
+        </div>
+    </EditForm>
+
+    @if (!IsNew && _detail is not null)
+    {
+        <div class="card my-3"><div class="card-body">
+            <h5 class="card-title">Delivery</h5>
+            @if (_detail.Status == ConsignmentStatus.Delivered)
+            {
+                <div class="alert alert-success">
+                    Delivered @_detail.DeliveredAt?.ToLocalTime().ToString("dd-MMM-yyyy HH:mm")
+                    to <strong>@_detail.ReceivedBy</strong>.
+                    @if (!string.IsNullOrWhiteSpace(_detail.DeliveryNotes))
+                    {
+                        <div class="small mt-1">@_detail.DeliveryNotes</div>
+                    }
+                </div>
+            }
+            else if (_detail.Status == ConsignmentStatus.Cancelled)
+            {
+                <div class="alert alert-secondary">This consignment is cancelled.</div>
+            }
+            else
+            {
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">Received by *</label>
+                        <input class="form-control" @bind="_deliver.ReceivedBy" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Delivered at</label>
+                        <input type="datetime-local" class="form-control" @bind="_deliveredAtLocal" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Notes</label>
+                        <input class="form-control" @bind="_deliver.DeliveryNotes" />
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="button" class="btn btn-success" @onclick="MarkDelivered"><i class="bi bi-check2-circle me-1"></i>Mark delivered</button>
+                    </div>
+                </div>
+            }
+        </div></div>
+
+        <div class="card my-3"><div class="card-body">
+            <h5 class="card-title">Proof of Delivery</h5>
+            @if (_detail.HasPod)
+            {
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-file-earmark-check fs-3 text-success"></i>
+                    <div class="flex-grow-1">
+                        <div><a href="@_detail.PodDownloadUrl" target="_blank">@_detail.PodFileName</a></div>
+                        <div class="text-muted small">@((_detail.PodFileSizeBytes ?? 0) / 1024) KB · uploaded @_detail.PodUploadedAt?.ToLocalTime().ToString("dd-MMM-yyyy HH:mm")</div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="DeletePod"><i class="bi bi-trash me-1"></i>Remove</button>
+                </div>
+            }
+            else
+            {
+                <div class="text-muted small mb-2">No POD uploaded yet (PDF / JPG / PNG, max 10 MB).</div>
+                <InputFile OnChange="UploadPod" class="form-control" accept=".pdf,.jpg,.jpeg,.png" />
+            }
+        </div></div>
+    }
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    [SupplyParameterFromQuery] public int? TripId { get; set; }
+
+    private bool IsNew => Id is null;
+    private bool _loading = true;
+    private string? _error;
+    private string? _message;
+
+    private ConsignmentUpsertDto _model = New();
+    private ConsignmentDetailDto? _detail;
+    private List<TripListItemDto> _trips = new();
+
+    private DeliverConsignmentDto _deliver = new();
+    private DateTime _deliveredAtLocal = DateTime.Now;
+
+    private static ConsignmentUpsertDto New() => new()
+    {
+        BookingDate = DateOnly.FromDateTime(DateTime.Today),
+        FreightTerms = FreightTerms.Prepaid
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _trips = await Api.GetTripsAsync();
+
+            if (Id.HasValue)
+            {
+                _detail = await Api.GetConsignmentAsync(Id.Value);
+                if (_detail is null) { _error = "Consignment not found."; }
+                else
+                {
+                    _model = new ConsignmentUpsertDto
+                    {
+                        TripId = _detail.TripId,
+                        LrNumber = _detail.LrNumber,
+                        BookingDate = _detail.BookingDate,
+                        ConsignorName = _detail.ConsignorName,
+                        ConsignorAddress = _detail.ConsignorAddress,
+                        ConsignorPhone = _detail.ConsignorPhone,
+                        ConsigneeName = _detail.ConsigneeName,
+                        ConsigneeAddress = _detail.ConsigneeAddress,
+                        ConsigneePhone = _detail.ConsigneePhone,
+                        GoodsDescription = _detail.GoodsDescription,
+                        Packages = _detail.Packages,
+                        WeightKg = _detail.WeightKg,
+                        DeclaredValue = _detail.DeclaredValue,
+                        FreightAmount = _detail.FreightAmount,
+                        FreightTerms = _detail.FreightTerms
+                    };
+                }
+            }
+            else
+            {
+                _detail = null;
+                _model = New();
+                if (TripId.HasValue) _model.TripId = TripId.Value;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load consignment: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        _error = null;
+        _message = null;
+        if (_model.TripId == 0)
+        {
+            _error = "Select a trip.";
+            return;
+        }
+        try
+        {
+            if (IsNew)
+            {
+                var created = await Api.CreateConsignmentAsync(_model);
+                Nav.NavigateTo($"/consignments/{created.Id}/edit");
+            }
+            else
+            {
+                await Api.UpdateConsignmentAsync(Id!.Value, _model);
+                _message = "Changes saved.";
+                await OnParametersSetAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save consignment: {ex.Message}";
+        }
+    }
+
+    private async Task MarkDelivered()
+    {
+        _error = null;
+        if (_detail is null) return;
+        if (string.IsNullOrWhiteSpace(_deliver.ReceivedBy))
+        {
+            _error = "Enter who received the goods.";
+            return;
+        }
+        try
+        {
+            _deliver.DeliveredAt = _deliveredAtLocal.ToUniversalTime();
+            await Api.DeliverConsignmentAsync(_detail.Id, _deliver);
+            _message = "Marked delivered.";
+            await OnParametersSetAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to mark delivered: {ex.Message}";
+        }
+    }
+
+    private async Task UploadPod(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        if (_detail is null) return;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
+            await Api.UploadConsignmentPodAsync(_detail.Id, e.File.Name, e.File.ContentType, stream);
+            _message = "POD uploaded.";
+            await OnParametersSetAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to upload POD: {ex.Message}";
+        }
+    }
+
+    private async Task DeletePod()
+    {
+        _error = null;
+        if (_detail is null) return;
+        try
+        {
+            await Api.DeleteConsignmentPodAsync(_detail.Id);
+            await OnParametersSetAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to remove POD: {ex.Message}";
+        }
+    }
+
+    private static string StatusClass(ConsignmentStatus s) => s switch
+    {
+        ConsignmentStatus.Booked => "bg-secondary",
+        ConsignmentStatus.InTransit => "bg-primary",
+        ConsignmentStatus.Delivered => "bg-success",
+        ConsignmentStatus.Returned => "bg-warning text-dark",
+        ConsignmentStatus.Cancelled => "bg-dark",
+        _ => "bg-light text-dark"
+    };
+}

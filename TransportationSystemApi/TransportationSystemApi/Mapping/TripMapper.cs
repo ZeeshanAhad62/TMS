@@ -58,10 +58,16 @@ public static class TripMapper
             ExpensesTotal = expenses,
             DriverPay = driverPay,
             NetProfit = revenue - fuelCost - expenses - driverPay,
+            ConsignmentCount = t.Consignments.Count,
             Expenses = t.Expenses
                 .OrderByDescending(e => e.Date)
                 .ThenBy(e => e.Id)
                 .Select(ToExpenseDto)
+                .ToList(),
+            Consignments = t.Consignments
+                .OrderByDescending(c => c.BookingDate)
+                .ThenByDescending(c => c.Id)
+                .Select(c => ConsignmentMapper.ToListItemDto(c))
                 .ToList()
         };
     }

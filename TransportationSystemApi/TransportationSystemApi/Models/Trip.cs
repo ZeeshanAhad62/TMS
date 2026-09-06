@@ -31,4 +31,5 @@ public class Trip
     public DateTime? UpdatedAt { get; set; }
 
     public List<TripExpense> Expenses { get; set; } = new();
+    public List<Consignment> Consignments { get; set; } = new();
 }

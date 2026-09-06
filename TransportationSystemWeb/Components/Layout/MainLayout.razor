@@ -71,6 +71,15 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @(SubLinkClass("/consignments") == "active" ? "active-module" : "")" title="Consignments / LR">
+                    <i class="bi bi-box2"></i> <span class="nav-text">Consignments / LR</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/consignments")" href="/consignments" title="Consignment Notes">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Consignment Notes</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @((SubLinkClass("/routes") == "active" || SubLinkClass("/rate-contracts") == "active") ? "active-module" : "")" title="Routes &amp; Rates">
                     <i class="bi bi-signpost-split"></i> <span class="nav-text">Routes &amp; Rates</span>
                 </div>

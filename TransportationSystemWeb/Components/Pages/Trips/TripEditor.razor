@@ -262,6 +262,41 @@ else
                 </a>
             </div></div>
         }
+        else if (_activeTab == "Consignments" && _detail is not null)
+        {
+            <div class="card"><div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="card-title mb-0">Consignments <span class="text-muted small">(@_detail.Consignments.Count)</span></h5>
+                    <a class="btn btn-sm btn-outline-primary" href="/consignments/new?tripId=@_detail.Id">
+                        <i class="bi bi-plus-lg me-1"></i>Add consignment
+                    </a>
+                </div>
+                @if (_detail.Consignments.Count == 0)
+                {
+                    <div class="text-muted small">No consignments booked on this trip yet.</div>
+                }
+                else
+                {
+                    <table class="table table-sm align-middle">
+                        <thead><tr><th>Code</th><th>LR #</th><th>Consignor → Consignee</th><th class="text-end">Weight</th><th>Status</th><th>POD</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var c in _detail.Consignments)
+                        {
+                            <tr>
+                                <td class="font-monospace">@c.ConsignmentCode</td>
+                                <td>@(string.IsNullOrWhiteSpace(c.LrNumber) ? "—" : c.LrNumber)</td>
+                                <td>@c.ConsignorName <span class="text-muted">→</span> @c.ConsigneeName</td>
+                                <td class="text-end">@(c.WeightKg?.ToString("N0") ?? "—") kg</td>
+                                <td>@c.Status.ToDisplayName()</td>
+                                <td>@(c.HasPod ? "✓" : "—")</td>
+                                <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="/consignments/@c.Id/edit"><i class="bi bi-pencil-square"></i></a></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </div></div>
+        }
 
         <div class="mt-3 d-flex gap-2">
             <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@(IsNew ? "Create Trip" : "Save Changes")</button>
@@ -275,7 +310,7 @@ else
 
     private bool IsNew => Id is null;
 
-    private static readonly string[] Tabs = { "Trip Details", "Expenses", "P&L" };
+    private static readonly string[] Tabs = { "Trip Details", "Expenses", "Consignments", "P&L" };
     private string _activeTab = "Trip Details";
 
     private bool _loading = true;

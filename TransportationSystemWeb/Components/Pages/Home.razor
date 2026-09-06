@@ -24,6 +24,7 @@
         <a class="btn btn-outline-primary btn-sm" href="/tracking"><i class="bi bi-geo-alt me-1"></i>Live Map</a>
         <a class="btn btn-outline-primary btn-sm" href="/routes"><i class="bi bi-signpost-split me-1"></i>Routes</a>
         <a class="btn btn-outline-primary btn-sm" href="/purchase-orders"><i class="bi bi-bag-check me-1"></i>Procurement</a>
+        <a class="btn btn-outline-primary btn-sm" href="/consignments"><i class="bi bi-box2 me-1"></i>Consignments</a>
     </div>
 </div>
 
@@ -997,6 +998,53 @@ else
             </div>
         </div>
     }
+
+    @if (_consignments is not null)
+    {
+        <div class="row g-3 mt-1">
+            <div class="col-lg-8">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">In Transit</div>
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-box2"></i></div>
+                            </div>
+                            <div class="stat-value">@ConsignmentCount(ConsignmentStatus.InTransit)</div>
+                            <div class="stat-sub text-muted">On the road now</div>
+                        </div></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Delivered</div>
+                                <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-check2-circle"></i></div>
+                            </div>
+                            <div class="stat-value text-success">@ConsignmentCount(ConsignmentStatus.Delivered)</div>
+                            <div class="stat-sub text-muted">All time</div>
+                        </div></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Pending POD</div>
+                                <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-file-earmark-x"></i></div>
+                            </div>
+                            <div class="stat-value text-warning">@PendingPodCount</div>
+                            <div class="stat-sub text-muted">Delivered, no POD uploaded</div>
+                        </div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100"><div class="card-body d-flex flex-column">
+                    <h6 class="mb-3">Consignments / LR</h6>
+                    <div class="text-muted small mb-3">Each trip can carry many consignment notes; capture a proof-of-delivery file when the goods are handed over.</div>
+                    <a class="btn btn-outline-primary btn-sm mt-auto" href="/consignments"><i class="bi bi-box2 me-1"></i>Consignment Notes</a>
+                </div></div>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -1016,6 +1064,7 @@ else
     private List<RateContractListItemDto>? _rateContracts;
     private List<VendorListItemDto>? _vendors;
     private List<PurchaseOrderListItemDto>? _purchaseOrders;
+    private List<ConsignmentListItemDto>? _consignments;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -1040,6 +1089,7 @@ else
             _rateContracts = await Api.GetRateContractsAsync();
             _vendors = await Api.GetVendorsAsync();
             _purchaseOrders = await Api.GetPurchaseOrdersAsync();
+            _consignments = await Api.GetConsignmentsAsync();
         }
         catch (Exception ex)
         {
@@ -1108,6 +1158,9 @@ else
             .ToList();
 
     private int LiveCount(VehicleMovementState s) => _live?.Count(v => v.MovementState == s) ?? 0;
+
+    private int ConsignmentCount(ConsignmentStatus s) => _consignments?.Count(c => c.Status == s) ?? 0;
+    private int PendingPodCount => _consignments?.Count(c => c.Status == ConsignmentStatus.Delivered && !c.HasPod) ?? 0;
 
     private int PoAwaitingCount => _purchaseOrders?.Count(o =>
         o.EffectiveStatus is PurchaseOrderStatus.Ordered or PurchaseOrderStatus.PartiallyReceived) ?? 0;

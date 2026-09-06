@@ -66,6 +66,7 @@ public class TripsController : ControllerBase
             .Include(t => t.Customer)
             .Include(t => t.Route)
             .Include(t => t.Expenses)
+            .Include(t => t.Consignments)
             .FirstOrDefaultAsync(t => t.Id == id);
         if (trip is null) return NotFound();
 

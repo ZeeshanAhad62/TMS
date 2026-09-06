@@ -1,0 +1,156 @@
+@page "/consignments"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Consignments - LR / POD</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Consignments</h2>
+        <div class="text-muted small">Consignments &rsaquo; LR / POD</div>
+    </div>
+    <a class="btn btn-primary" href="/consignments/new"><i class="bi bi-plus-lg me-1"></i>New Consignment</a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Consignments</div><div class="stat-value">@(_items?.Count ?? 0)</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">In Transit</div><div class="stat-value text-primary">@Count(ConsignmentStatus.InTransit)</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Delivered</div><div class="stat-value text-success">@Count(ConsignmentStatus.Delivered)</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Pending POD</div><div class="stat-value text-warning">@PendingPodCount</div>
+    </div></div></div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-5">
+            <input class="form-control" placeholder="Search code, LR #, consignor, consignee..." @bind="_search" @bind:event="oninput" @onkeyup="OnKey" />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="_status">
+                <option value="">All statuses</option>
+                @foreach (var s in Enum.GetValues<ConsignmentStatus>())
+                {
+                    <option value="@s">@s.ToDisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" @bind="_pendingPod">
+                <option value="">POD: any</option>
+                <option value="true">Pending POD</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="Load"><i class="bi bi-funnel me-1"></i>Apply</button>
+        </div>
+    </div>
+</div></div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_items is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_items.Count == 0)
+{
+    <div class="alert alert-info">No consignments found. Click "New Consignment" to book one against a trip.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr><th>Code</th><th>LR #</th><th>Trip</th><th>Consignor → Consignee</th><th class="text-end">Weight</th><th class="text-end">Freight</th><th>Status</th><th>POD</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var c in _items)
+                {
+                    <tr>
+                        <td class="font-monospace">@c.ConsignmentCode</td>
+                        <td>@(string.IsNullOrWhiteSpace(c.LrNumber) ? "—" : c.LrNumber)</td>
+                        <td class="font-monospace small">@c.TripCode</td>
+                        <td>@c.ConsignorName <span class="text-muted">→</span> @c.ConsigneeName</td>
+                        <td class="text-end">@(c.WeightKg?.ToString("N0") ?? "—") kg</td>
+                        <td class="text-end">@(c.FreightAmount?.ToString("N2") ?? "—")<div class="text-muted small">@c.FreightTerms.ToDisplayName()</div></td>
+                        <td><span class="badge @StatusClass(c.Status)">@c.Status.ToDisplayName()</span></td>
+                        <td>@(c.HasPod ? "✓" : (c.Status == ConsignmentStatus.Delivered ? "⚠" : "—"))</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/consignments/@c.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(c.Id)"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<ConsignmentListItemDto>? _items;
+    private string _search = "";
+    private string _status = "";
+    private string _pendingPod = "";
+    private string? _error;
+
+    private int Count(ConsignmentStatus s) => _items?.Count(c => c.Status == s) ?? 0;
+    private int PendingPodCount => _items?.Count(c => c.Status == ConsignmentStatus.Delivered && !c.HasPod) ?? 0;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            ConsignmentStatus? status = Enum.TryParse<ConsignmentStatus>(_status, out var s) ? s : null;
+            bool? pending = _pendingPod == "true" ? true : null;
+            _items = await Api.GetConsignmentsAsync(null, status, pending, _search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load consignments: {ex.Message}";
+            _items = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this consignment and its POD file?")) return;
+        try
+        {
+            await Api.DeleteConsignmentAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete consignment: {ex.Message}";
+        }
+    }
+
+    private static string StatusClass(ConsignmentStatus s) => s switch
+    {
+        ConsignmentStatus.Booked => "bg-secondary",
+        ConsignmentStatus.InTransit => "bg-primary",
+        ConsignmentStatus.Delivered => "bg-success",
+        ConsignmentStatus.Returned => "bg-warning text-dark",
+        ConsignmentStatus.Cancelled => "bg-dark",
+        _ => "bg-light text-dark"
+    };
+}

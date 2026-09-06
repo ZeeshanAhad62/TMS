@@ -302,3 +302,21 @@ public enum PurchaseOrderStatus
     Received,
     Cancelled
 }
+
+// Consignment note / LR / POD (module 12).
+public enum ConsignmentStatus
+{
+    Booked,
+    InTransit,
+    Delivered,
+    Returned,
+    Cancelled
+}
+
+// Who bears the freight charge on a consignment.
+public enum FreightTerms
+{
+    Prepaid,   // paid by the consignor at booking
+    ToPay,     // collected from the consignee on delivery
+    Billed     // added to the customer's account / invoice
+}

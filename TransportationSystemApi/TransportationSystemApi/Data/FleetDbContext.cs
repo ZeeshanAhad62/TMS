@@ -46,6 +46,7 @@ public class FleetDbContext : DbContext
     public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
+    public DbSet<Consignment> Consignments => Set<Consignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -226,6 +227,11 @@ public class FleetDbContext : DbContext
             entity.HasMany(t => t.Expenses)
                 .WithOne(e => e.Trip)
                 .HasForeignKey(e => e.TripId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(t => t.Consignments)
+                .WithOne(c => c.Trip)
+                .HasForeignKey(c => c.TripId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -451,6 +457,17 @@ public class FleetDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(l => l.PartId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Consignment>(entity =>
+        {
+            entity.HasIndex(c => c.ConsignmentCode).IsUnique();
+            entity.HasIndex(c => c.TripId);
+            entity.HasIndex(c => c.LrNumber);
+            entity.HasIndex(c => c.Status);
+            entity.Property(c => c.WeightKg).HasPrecision(18, 2);
+            entity.Property(c => c.DeclaredValue).HasPrecision(18, 2);
+            entity.Property(c => c.FreightAmount).HasPrecision(18, 2);
         });
     }
 }
