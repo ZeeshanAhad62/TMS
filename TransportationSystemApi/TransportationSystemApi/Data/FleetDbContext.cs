@@ -50,6 +50,7 @@ public class FleetDbContext : DbContext
     public DbSet<Incident> Incidents => Set<Incident>();
     public DbSet<InsuranceClaim> InsuranceClaims => Set<InsuranceClaim>();
     public DbSet<IncidentPhoto> IncidentPhotos => Set<IncidentPhoto>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -511,6 +512,14 @@ public class FleetDbContext : DbContext
             entity.Property(c => c.AmountApproved).HasPrecision(18, 2);
             entity.Property(c => c.AmountReceived).HasPrecision(18, 2);
             entity.Property(c => c.Deductible).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("AuditLog");
+            entity.HasIndex(a => a.Timestamp);
+            entity.HasIndex(a => new { a.EntityName, a.EntityId });
+            entity.HasIndex(a => a.UserId);
         });
     }
 }

@@ -1296,6 +1296,37 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Audit Log (module 15) -----
+
+    public async Task<AuditLogPageDto> GetAuditLogAsync(
+        string? entity = null, string? action = null, int? userId = null,
+        DateTime? from = null, DateTime? to = null, string? search = null, int page = 1, int pageSize = 50)
+    {
+        await AuthorizeAsync();
+        var q = new List<string> { $"page={page}", $"pageSize={pageSize}" };
+        if (!string.IsNullOrWhiteSpace(entity)) q.Add($"entity={Uri.EscapeDataString(entity)}");
+        if (!string.IsNullOrWhiteSpace(action)) q.Add($"action={Uri.EscapeDataString(action)}");
+        if (userId.HasValue) q.Add($"userId={userId}");
+        if (from.HasValue) q.Add($"from={Uri.EscapeDataString(from.Value.ToString("o"))}");
+        if (to.HasValue) q.Add($"to={Uri.EscapeDataString(to.Value.ToString("o"))}");
+        if (!string.IsNullOrWhiteSpace(search)) q.Add($"search={Uri.EscapeDataString(search)}");
+        return await _http.GetFromJsonAsync<AuditLogPageDto>($"api/audit-logs?{string.Join("&", q)}", JsonOptions) ?? new();
+    }
+
+    public async Task<AuditLogDetailDto?> GetAuditLogEntryAsync(long id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/audit-logs/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<AuditLogDetailDto>(JsonOptions);
+    }
+
+    public async Task<AuditLogFacetsDto> GetAuditLogFacetsAsync()
+    {
+        await AuthorizeAsync();
+        return await _http.GetFromJsonAsync<AuditLogFacetsDto>("api/audit-logs/facets", JsonOptions) ?? new();
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

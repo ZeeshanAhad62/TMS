@@ -17,6 +17,7 @@ builder.Services.AddControllers(options =>
     {
         options.Filters.Add(new AuthorizeFilter());
         options.Filters.Add<TransportationSystemApi.Services.StaffOnlyFilter>();
+        options.Filters.Add<TransportationSystemApi.Services.RbacFilter>();
     })
     .AddJsonOptions(options =>
     {
@@ -26,8 +27,12 @@ builder.Services.AddControllers(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddDbContext<FleetDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("FleetDb")));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<TransportationSystemApi.Services.AuditSaveChangesInterceptor>();
+
+builder.Services.AddDbContext<FleetDbContext>((sp, options) =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("FleetDb"))
+           .AddInterceptors(sp.GetRequiredService<TransportationSystemApi.Services.AuditSaveChangesInterceptor>()));
 
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddHttpClient<GeoLocationService>();

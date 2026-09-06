@@ -1,0 +1,168 @@
+@page "/settings/audit-log"
+@attribute [Authorize(Roles = "Admin")]
+@inject FleetApiClient Api
+
+<PageTitle>Audit Log - Settings</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Audit Log</h2>
+        <div class="text-muted small">Settings &rsaquo; Audit Log</div>
+    </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-3">
+            <select class="form-select" @bind="_entity">
+                <option value="">All entities</option>
+                @foreach (var e in _facets.EntityNames)
+                {
+                    <option value="@e">@e</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" @bind="_action">
+                <option value="">All actions</option>
+                @foreach (var a in _facets.Actions)
+                {
+                    <option value="@a">@a</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-5">
+            <input class="form-control" placeholder="Search entity, user, changed value..." @bind="_search" @bind:event="oninput" @onkeyup="OnKey" />
+        </div>
+        <div class="col-md-2 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="() => Load(1)"><i class="bi bi-funnel me-1"></i>Apply</button>
+        </div>
+    </div>
+</div></div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_page is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_page.Items.Count == 0)
+{
+    <div class="alert alert-info">No audit entries match.</div>
+}
+else
+{
+    <div class="text-muted small mb-2">@_page.Total entries — page @_page.Page</div>
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Id</th><th>Change</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var e in _page.Items)
+                {
+                    <tr>
+                        <td class="small">@e.Timestamp.ToLocalTime().ToString("dd-MMM-yy HH:mm:ss")</td>
+                        <td>@(string.IsNullOrWhiteSpace(e.UserName) ? "—" : e.UserName)</td>
+                        <td><span class="badge @ActionClass(e.Action)">@e.Action</span></td>
+                        <td>@e.EntityName</td>
+                        <td class="font-monospace small">@(e.EntityId ?? "—")</td>
+                        <td class="small">@e.Summary</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => Toggle(e.Id)">
+                                @(_expandedId == e.Id ? "Hide" : "View")
+                            </button>
+                        </td>
+                    </tr>
+                    @if (_expandedId == e.Id)
+                    {
+                        <tr>
+                            <td colspan="7">
+                                @if (_detail is null)
+                                {
+                                    <em>Loading...</em>
+                                }
+                                else
+                                {
+                                    <pre class="bg-light p-2 rounded small mb-0" style="white-space:pre-wrap;">@Pretty(_detail.ChangesJson)</pre>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" disabled="@(_page.Page <= 1)" @onclick="() => Load(_page.Page - 1)">&larr; Newer</button>
+        <button class="btn btn-outline-secondary btn-sm" disabled="@(_page.Page * _page.PageSize >= _page.Total)" @onclick="() => Load(_page.Page + 1)">Older &rarr;</button>
+    </div>
+}
+
+@code {
+    private AuditLogPageDto? _page;
+    private AuditLogFacetsDto _facets = new();
+    private AuditLogDetailDto? _detail;
+    private long? _expandedId;
+    private string _entity = "";
+    private string _action = "";
+    private string _search = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _facets = await Api.GetAuditLogFacetsAsync(); } catch { }
+        await Load(1);
+    }
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load(1);
+    }
+
+    private async Task Load(int page)
+    {
+        _error = null;
+        _expandedId = null;
+        try
+        {
+            _page = await Api.GetAuditLogAsync(_entity, _action, search: _search, page: page);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load audit log: {ex.Message}";
+            _page = new();
+        }
+    }
+
+    private async Task Toggle(long id)
+    {
+        if (_expandedId == id) { _expandedId = null; return; }
+        _expandedId = id;
+        _detail = null;
+        _detail = await Api.GetAuditLogEntryAsync(id);
+    }
+
+    private static string ActionClass(string a) => a switch
+    {
+        "Insert" => "bg-success",
+        "Update" => "bg-primary",
+        "Delete" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static string Pretty(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return "(no detail)";
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            return System.Text.Json.JsonSerializer.Serialize(doc, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        }
+        catch { return json; }
+    }
+}
