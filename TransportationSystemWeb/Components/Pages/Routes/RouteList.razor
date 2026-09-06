@@ -1,0 +1,133 @@
+@page "/routes"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Routes - Routes &amp; Rates</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Routes</h2>
+        <div class="text-muted small">Routes &amp; Rates &rsaquo; Route Master</div>
+    </div>
+    <a class="btn btn-primary" href="/routes/new"><i class="bi bi-plus-lg me-1"></i>Add Route</a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Routes</div><div class="stat-value">@(_routes?.Count ?? 0)</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Active</div><div class="stat-value text-success">@(_routes?.Count(r => r.IsActive) ?? 0)</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">With Contracts</div><div class="stat-value">@(_routes?.Count(r => r.ActiveContractCount > 0) ?? 0)</div>
+    </div></div></div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-7">
+            <input class="form-control" placeholder="Search code, name, origin, destination..." @bind="_search" @bind:event="oninput" @onkeyup="OnKey" />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="_activeOnly">
+                <option value="">All</option>
+                <option value="true">Active only</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="Load"><i class="bi bi-funnel me-1"></i>Apply</button>
+        </div>
+    </div>
+</div></div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_routes is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_routes.Count == 0)
+{
+    <div class="alert alert-info">No routes found. Click "Add Route" to create the first one.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr><th>Code</th><th>Name / Lane</th><th class="text-end">Distance</th><th class="text-end">Standard Rate</th><th class="text-end">Contracts</th><th>Active</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var r in _routes)
+                {
+                    <tr class="@(r.IsActive ? "" : "text-muted")">
+                        <td class="font-monospace">@r.RouteCode</td>
+                        <td>
+                            @(string.IsNullOrWhiteSpace(r.Name) ? $"{r.Origin} → {r.Destination}" : r.Name)
+                            @if (!string.IsNullOrWhiteSpace(r.Name))
+                            {
+                                <div class="text-muted small">@r.Origin → @r.Destination</div>
+                            }
+                        </td>
+                        <td class="text-end">@(r.DistanceKm?.ToString("N0") ?? "—") km</td>
+                        <td class="text-end">@(r.StandardRate?.ToString("N2") ?? "—")</td>
+                        <td class="text-end">@r.ActiveContractCount</td>
+                        <td>@(r.IsActive ? "Yes" : "No")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/routes/@r.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(r.Id)"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<RouteListItemDto>? _routes;
+    private string _search = "";
+    private string _activeOnly = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            bool? active = _activeOnly == "true" ? true : null;
+            _routes = await Api.GetRoutesAsync(active, _search);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load routes: {ex.Message}";
+            _routes = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this route? Its rate contracts are deleted too; trips keep their origin/destination but lose the link.")) return;
+        try
+        {
+            await Api.DeleteRouteAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete route: {ex.Message}";
+        }
+    }
+}

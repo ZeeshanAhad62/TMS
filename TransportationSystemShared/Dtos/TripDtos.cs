@@ -11,6 +11,7 @@ public class TripListItemDto
     public string VehicleRegistrationNumber { get; set; } = string.Empty;
     public string DriverName { get; set; } = string.Empty;
     public string? CustomerName { get; set; }
+    public string? RouteCode { get; set; }
     public string Origin { get; set; } = string.Empty;
     public string Destination { get; set; } = string.Empty;
     public DateOnly StartDate { get; set; }
@@ -29,6 +30,8 @@ public class TripDetailDto : TripUpsertDto
     public string VehicleRegistrationNumber { get; set; } = string.Empty;
     public string DriverName { get; set; } = string.Empty;
     public string? CustomerName { get; set; }
+    public string? RouteCode { get; set; }
+    public string? RouteLabel { get; set; }
 
     // Per-trip P&L (driver pay stays 0 until the Payroll module lands).
     public decimal RevenueAmount { get; set; }
@@ -78,6 +81,8 @@ public class TripUpsertDto
     public int DriverId { get; set; }
 
     public int? CustomerId { get; set; }
+
+    public int? RouteId { get; set; }
 
     [Required, MaxLength(150)]
     public string Origin { get; set; } = string.Empty;

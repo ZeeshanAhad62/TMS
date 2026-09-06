@@ -1,0 +1,223 @@
+@page "/rate-contracts/new"
+@page "/rate-contracts/{Id:int}/edit"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "Add Rate Contract" : "Edit Rate Contract") - Routes &amp; Rates</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">
+            @if (IsNew)
+            {
+                <text>Add Rate Contract</text>
+            }
+            else
+            {
+                <span class="font-monospace">@_detail?.ContractCode</span>
+                <text> &mdash; @_detail?.CustomerName</text>
+            }
+        </h2>
+        <div class="text-muted small">Routes &amp; Rates &rsaquo; Rate Contracts</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="/rate-contracts"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+@if (_message is not null)
+{
+    <div class="alert alert-success">@_message</div>
+}
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm Model="_model" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+
+        <div class="card"><div class="card-body">
+            <h5 class="card-title">Contract Details</h5>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Customer *</label>
+                    <InputSelect class="form-select" @bind-Value="_model.CustomerId">
+                        <option value="0">Select a customer...</option>
+                        @foreach (var c in _customers)
+                        {
+                            <option value="@c.Id">@c.CustomerCode &mdash; @c.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Route *</label>
+                    <InputSelect class="form-select" @bind-Value="_model.RouteId">
+                        <option value="0">Select a route...</option>
+                        @foreach (var r in _routes)
+                        {
+                            <option value="@r.Id">@r.RouteCode &mdash; @r.Origin → @r.Destination</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Vehicle Type</label>
+                    <select class="form-select" @bind="_vehicleType">
+                        <option value="">Any type</option>
+                        @foreach (var vt in Enum.GetValues<VehicleType>())
+                        {
+                            <option value="@vt">@vt.ToDisplayName()</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Rate *</label>
+                    <InputNumber class="form-control" @bind-Value="_model.Rate" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Basis</label>
+                    <InputSelect class="form-select" @bind-Value="_model.RateBasis">
+                        @foreach (var b in Enum.GetValues<RateBasis>())
+                        {
+                            <option value="@b">@b.ToDisplayName()</option>
+                        }
+                    </InputSelect>
+                    <div class="form-text">Per Km multiplies by the route's distance.</div>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Valid From *</label>
+                    <InputDate class="form-control" @bind-Value="_model.ValidFrom" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Valid To</label>
+                    <InputDate class="form-control" @bind-Value="_model.ValidTo" />
+                    <div class="form-text">Leave blank for an open-ended contract.</div>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="active" @bind="_model.IsActive" />
+                        <label class="form-check-label" for="active">Active</label>
+                    </div>
+                </div>
+
+                <div class="col-md-12">
+                    <label class="form-label">Notes</label>
+                    <InputTextArea class="form-control" rows="2" @bind-Value="_model.Notes" />
+                </div>
+            </div>
+        </div></div>
+
+        <div class="mt-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@(IsNew ? "Create Contract" : "Save Changes")</button>
+            <a class="btn btn-outline-secondary" href="/rate-contracts">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    [SupplyParameterFromQuery] public int? RouteId { get; set; }
+
+    private bool IsNew => Id is null;
+    private bool _loading = true;
+    private string? _error;
+    private string? _message;
+
+    private RateContractUpsertDto _model = New();
+    private RateContractDetailDto? _detail;
+    private List<CustomerListItemDto> _customers = new();
+    private List<RouteListItemDto> _routes = new();
+    private string _vehicleType = "";
+
+    private static RateContractUpsertDto New() => new()
+    {
+        ValidFrom = DateOnly.FromDateTime(DateTime.Today),
+        RateBasis = RateBasis.PerTrip,
+        IsActive = true
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _customers = await Api.GetCustomersAsync();
+            _routes = await Api.GetRoutesAsync();
+
+            if (Id.HasValue)
+            {
+                _detail = await Api.GetRateContractAsync(Id.Value);
+                if (_detail is null) { _error = "Rate contract not found."; }
+                else
+                {
+                    _model = new RateContractUpsertDto
+                    {
+                        CustomerId = _detail.CustomerId,
+                        RouteId = _detail.RouteId,
+                        VehicleType = _detail.VehicleType,
+                        Rate = _detail.Rate,
+                        RateBasis = _detail.RateBasis,
+                        ValidFrom = _detail.ValidFrom,
+                        ValidTo = _detail.ValidTo,
+                        IsActive = _detail.IsActive,
+                        Notes = _detail.Notes
+                    };
+                    _vehicleType = _detail.VehicleType?.ToString() ?? "";
+                }
+            }
+            else
+            {
+                _detail = null;
+                _model = New();
+                if (RouteId.HasValue) _model.RouteId = RouteId.Value;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        _error = null;
+        _message = null;
+
+        if (_model.CustomerId == 0 || _model.RouteId == 0)
+        {
+            _error = "Select both a customer and a route.";
+            return;
+        }
+        _model.VehicleType = Enum.TryParse<VehicleType>(_vehicleType, out var vt) ? vt : null;
+
+        try
+        {
+            if (IsNew)
+            {
+                var created = await Api.CreateRateContractAsync(_model);
+                Nav.NavigateTo($"/rate-contracts/{created.Id}/edit");
+            }
+            else
+            {
+                await Api.UpdateRateContractAsync(Id!.Value, _model);
+                _message = "Changes saved.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

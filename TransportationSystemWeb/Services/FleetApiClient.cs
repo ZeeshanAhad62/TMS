@@ -922,6 +922,103 @@ public class FleetApiClient
         await EnsureSuccess(response);
     }
 
+    // ----- Routes & Rate Contracts (module 10) -----
+
+    public async Task<List<RouteListItemDto>> GetRoutesAsync(bool? activeOnly = null, string? search = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (activeOnly.HasValue) query.Add($"activeOnly={activeOnly.Value.ToString().ToLowerInvariant()}");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+        return await _http.GetFromJsonAsync<List<RouteListItemDto>>($"api/routes{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<RouteDetailDto?> GetRouteAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/routes/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<RouteDetailDto>(JsonOptions);
+    }
+
+    public async Task<RouteDetailDto> CreateRouteAsync(RouteUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/routes", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<RouteDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateRouteAsync(int id, RouteUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/routes/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteRouteAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/routes/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<List<RateContractListItemDto>> GetRateContractsAsync(
+        int? customerId = null, int? routeId = null, bool? activeOnly = null, bool? currentOnly = null)
+    {
+        await AuthorizeAsync();
+        var query = new List<string>();
+        if (customerId.HasValue) query.Add($"customerId={customerId}");
+        if (routeId.HasValue) query.Add($"routeId={routeId}");
+        if (activeOnly.HasValue) query.Add($"activeOnly={activeOnly.Value.ToString().ToLowerInvariant()}");
+        if (currentOnly.HasValue) query.Add($"currentOnly={currentOnly.Value.ToString().ToLowerInvariant()}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : "";
+        return await _http.GetFromJsonAsync<List<RateContractListItemDto>>($"api/rate-contracts{qs}", JsonOptions) ?? new();
+    }
+
+    public async Task<RateContractDetailDto?> GetRateContractAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.GetAsync($"api/rate-contracts/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<RateContractDetailDto>(JsonOptions);
+    }
+
+    public async Task<RateContractDetailDto> CreateRateContractAsync(RateContractUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PostAsJsonAsync("api/rate-contracts", dto, JsonOptions);
+        await EnsureSuccess(response);
+        return (await response.Content.ReadFromJsonAsync<RateContractDetailDto>(JsonOptions))!;
+    }
+
+    public async Task UpdateRateContractAsync(int id, RateContractUpsertDto dto)
+    {
+        await AuthorizeAsync();
+        var response = await _http.PutAsJsonAsync($"api/rate-contracts/{id}", dto, JsonOptions);
+        await EnsureSuccess(response);
+    }
+
+    public async Task DeleteRateContractAsync(int id)
+    {
+        await AuthorizeAsync();
+        var response = await _http.DeleteAsync($"api/rate-contracts/{id}");
+        await EnsureSuccess(response);
+    }
+
+    public async Task<RateQuoteDto?> GetRateQuoteAsync(int routeId, int? customerId, VehicleType? vehicleType, DateOnly? onDate)
+    {
+        await AuthorizeAsync();
+        var query = new List<string> { $"routeId={routeId}" };
+        if (customerId.HasValue) query.Add($"customerId={customerId}");
+        if (vehicleType.HasValue) query.Add($"vehicleType={vehicleType}");
+        if (onDate.HasValue) query.Add($"onDate={onDate.Value:yyyy-MM-dd}");
+        var response = await _http.GetAsync($"api/rate-contracts/quote?{string.Join("&", query)}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<RateQuoteDto>(JsonOptions);
+    }
+
     // ----- Reports & Analytics -----
 
     public async Task<ReportsSummaryDto?> GetReportsSummaryAsync()

@@ -89,7 +89,13 @@ else
                         <td>@t.VehicleCode &mdash; @t.VehicleRegistrationNumber</td>
                         <td>@t.DriverName</td>
                         <td>@(string.IsNullOrWhiteSpace(t.CustomerName) ? "—" : t.CustomerName)</td>
-                        <td>@t.Origin &rarr; @t.Destination</td>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(t.RouteCode))
+                            {
+                                <span class="font-monospace small">@t.RouteCode</span> <br />
+                            }
+                            <span class="@(string.IsNullOrWhiteSpace(t.RouteCode) ? "" : "text-muted small")">@t.Origin &rarr; @t.Destination</span>
+                        </td>
                         <td>@t.StartDate.ToString("dd-MMM-yyyy")</td>
                         <td>@(t.EndDate?.ToString("dd-MMM-yyyy") ?? "—")</td>
                         <td><span class="badge @StatusBadgeClass(t.Status)">@t.Status.ToDisplayName()</span></td>

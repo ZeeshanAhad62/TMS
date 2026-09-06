@@ -95,6 +95,42 @@ else
                     </div>
 
                     <div class="col-md-4">
+                        <label class="form-label">Route</label>
+                        <InputSelect class="form-select" @bind-Value="_model.RouteId" @bind-Value:after="OnRouteChanged">
+                            <option value="">— None (ad-hoc lane) —</option>
+                            @foreach (var r in _routes)
+                            {
+                                <option value="@r.Id">@r.RouteCode &mdash; @r.Origin → @r.Destination</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-8 d-flex align-items-end">
+                        @if (_quote is not null)
+                        {
+                            <div class="small">
+                                @switch (_quote.Source)
+                                {
+                                    case RateQuoteSource.Contract:
+                                        <span class="badge bg-success me-1">Contract @_quote.ContractCode</span>
+                                        break;
+                                    case RateQuoteSource.RouteStandard:
+                                        <span class="badge bg-info text-dark me-1">Route standard rate</span>
+                                        break;
+                                    default:
+                                        <span class="badge bg-secondary me-1">No rate on file</span>
+                                        break;
+                                }
+                                @if (_quote.Amount is decimal amt)
+                                {
+                                    <text>Suggested revenue: <strong>@amt.ToString("N2")</strong>
+                                        (@_quote.RateBasis?.ToDisplayName()@(_quote.RateBasis == RateBasis.PerKm && _quote.DistanceKm is decimal d ? $" × {d:N0} km" : ""))</text>
+                                    <button type="button" class="btn btn-sm btn-outline-primary ms-2" @onclick="ApplyQuote">Use it</button>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="col-md-4">
                         <label class="form-label">Origin *</label>
                         <InputText class="form-control" @bind-Value="_model.Origin" />
                         <ValidationMessage For="() => _model.Origin" />
@@ -251,6 +287,8 @@ else
     private List<VehicleListItemDto> _vehicles = new();
     private List<DriverListItemDto> _drivers = new();
     private List<CustomerListItemDto> _customers = new();
+    private List<RouteListItemDto> _routes = new();
+    private RateQuoteDto? _quote;
 
     private TripExpenseUpsertDto _newExpense = NewExpense();
 
@@ -275,6 +313,7 @@ else
             _vehicles = await Api.GetVehiclesAsync();
             _drivers = await Api.GetDriversAsync();
             _customers = await Api.GetCustomersAsync();
+            _routes = await Api.GetRoutesAsync(activeOnly: true);
 
             if (Id.HasValue)
             {
@@ -286,6 +325,7 @@ else
                 else
                 {
                     _model = _detail;
+                    if (_model.RouteId.HasValue) await OnRouteChanged();
                 }
             }
             else
@@ -333,6 +373,40 @@ else
         {
             _error = $"Failed to save trip: {ex.Message}";
         }
+    }
+
+    // ----- Route / rate quote -----
+
+    private async Task OnRouteChanged()
+    {
+        _quote = null;
+        if (_model.RouteId is not int routeId) return;
+
+        var route = _routes.FirstOrDefault(r => r.Id == routeId);
+        if (route is not null)
+        {
+            if (string.IsNullOrWhiteSpace(_model.Origin)) _model.Origin = route.Origin;
+            if (string.IsNullOrWhiteSpace(_model.Destination)) _model.Destination = route.Destination;
+        }
+
+        try
+        {
+            VehicleType? vt = _model.VehicleId > 0
+                ? _vehicles.FirstOrDefault(v => v.Id == _model.VehicleId)?.VehicleType
+                : null;
+            _quote = await Api.GetRateQuoteAsync(routeId, _model.CustomerId, vt, _model.StartDate);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to fetch rate: {ex.Message}";
+        }
+    }
+
+    private void ApplyQuote()
+    {
+        if (_quote?.Amount is decimal amt) _model.Revenue = amt;
+        if (!string.IsNullOrWhiteSpace(_quote?.Origin)) _model.Origin = _quote!.Origin!;
+        if (!string.IsNullOrWhiteSpace(_quote?.Destination)) _model.Destination = _quote!.Destination!;
     }
 
     // ----- Expenses -----

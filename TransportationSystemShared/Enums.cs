@@ -265,3 +265,18 @@ public enum VehicleMovementState
     Idle,
     Offline
 }
+
+// Route & Rate-Contract Management (module 10). How a rate figure is applied.
+public enum RateBasis
+{
+    PerTrip,
+    PerKm
+}
+
+// Where a resolved trip rate came from (RateContractsController.Quote).
+public enum RateQuoteSource
+{
+    None,
+    RouteStandard,
+    Contract
+}

@@ -1,0 +1,156 @@
+@page "/rate-contracts"
+@attribute [Authorize]
+@inject FleetApiClient Api
+@inject IJSRuntime JS
+
+<PageTitle>Rate Contracts - Routes &amp; Rates</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Rate Contracts</h2>
+        <div class="text-muted small">Routes &amp; Rates &rsaquo; Rate Contracts</div>
+    </div>
+    <a class="btn btn-primary" href="/rate-contracts/new"><i class="bi bi-plus-lg me-1"></i>Add Contract</a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Contracts</div><div class="stat-value">@(_contracts?.Count ?? 0)</div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card stat-card h-100"><div class="card-body">
+        <div class="stat-label">Valid Now</div><div class="stat-value text-success">@(_contracts?.Count(c => c.IsCurrentlyValid) ?? 0)</div>
+    </div></div></div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+        <div class="col-md-4">
+            <select class="form-select" @bind="_customerId">
+                <option value="">All customers</option>
+                @if (_customers is not null)
+                {
+                    @foreach (var c in _customers)
+                    {
+                        <option value="@c.Id">@c.CustomerCode — @c.Name</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <select class="form-select" @bind="_routeId">
+                <option value="">All routes</option>
+                @if (_routes is not null)
+                {
+                    @foreach (var r in _routes)
+                    {
+                        <option value="@r.Id">@r.RouteCode — @r.Origin → @r.Destination</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" @bind="_currentOnly">
+                <option value="">Any</option>
+                <option value="true">Valid now</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button class="btn btn-outline-secondary" @onclick="Load"><i class="bi bi-funnel me-1"></i>Apply</button>
+        </div>
+    </div>
+</div></div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_contracts is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_contracts.Count == 0)
+{
+    <div class="alert alert-info">No rate contracts found.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover bg-white align-middle">
+            <thead class="table-light">
+                <tr><th>Code</th><th>Customer</th><th>Route</th><th>Vehicle Type</th><th class="text-end">Rate</th><th>Basis</th><th>Valid</th><th>Now</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var c in _contracts)
+                {
+                    <tr class="@(c.IsActive ? "" : "text-muted")">
+                        <td class="font-monospace">@c.ContractCode</td>
+                        <td>@c.CustomerName</td>
+                        <td class="small">@c.RouteCode<div class="text-muted">@c.RouteLabel</div></td>
+                        <td>@(c.VehicleType?.ToDisplayName() ?? "Any")</td>
+                        <td class="text-end">@c.Rate.ToString("N2")</td>
+                        <td>@c.RateBasis.ToDisplayName()</td>
+                        <td class="small">@c.ValidFrom.ToString("dd-MMM-yy") – @(c.ValidTo?.ToString("dd-MMM-yy") ?? "open")</td>
+                        <td>@(c.IsCurrentlyValid ? "✓" : "—")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" href="/rate-contracts/@c.Id/edit"><i class="bi bi-pencil-square"></i></a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(c.Id)"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<RateContractListItemDto>? _contracts;
+    private List<CustomerListItemDto>? _customers;
+    private List<RouteListItemDto>? _routes;
+    private string _customerId = "";
+    private string _routeId = "";
+    private string _currentOnly = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _customers = await Api.GetCustomersAsync();
+            _routes = await Api.GetRoutesAsync();
+        }
+        catch { _customers ??= new(); _routes ??= new(); }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try
+        {
+            int? cid = int.TryParse(_customerId, out var c) ? c : null;
+            int? rid = int.TryParse(_routeId, out var r) ? r : null;
+            bool? cur = _currentOnly == "true" ? true : null;
+            _contracts = await Api.GetRateContractsAsync(cid, rid, null, cur);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load rate contracts: {ex.Message}";
+            _contracts = new();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this rate contract?")) return;
+        try
+        {
+            await Api.DeleteRateContractAsync(id);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete rate contract: {ex.Message}";
+        }
+    }
+}

@@ -13,6 +13,7 @@ public static class TripMapper
         VehicleRegistrationNumber = t.Vehicle?.RegistrationNumber ?? string.Empty,
         DriverName = t.Driver?.FullName ?? string.Empty,
         CustomerName = t.Customer?.Name,
+        RouteCode = t.Route?.RouteCode,
         Origin = t.Origin,
         Destination = t.Destination,
         StartDate = t.StartDate,
@@ -39,9 +40,12 @@ public static class TripMapper
             VehicleRegistrationNumber = t.Vehicle?.RegistrationNumber ?? string.Empty,
             DriverName = t.Driver?.FullName ?? string.Empty,
             CustomerName = t.Customer?.Name,
+            RouteCode = t.Route?.RouteCode,
+            RouteLabel = t.Route is null ? null : RouteRateMapper.Label(t.Route),
             VehicleId = t.VehicleId,
             DriverId = t.DriverId,
             CustomerId = t.CustomerId,
+            RouteId = t.RouteId,
             Origin = t.Origin,
             Destination = t.Destination,
             StartDate = t.StartDate,
@@ -88,6 +92,7 @@ public static class TripMapper
         t.VehicleId = dto.VehicleId;
         t.DriverId = dto.DriverId;
         t.CustomerId = dto.CustomerId;
+        t.RouteId = dto.RouteId;
         t.Origin = dto.Origin;
         t.Destination = dto.Destination;
         t.StartDate = dto.StartDate;

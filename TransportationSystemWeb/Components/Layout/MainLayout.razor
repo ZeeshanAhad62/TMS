@@ -71,6 +71,18 @@
             </div>
 
             <div class="nav-module">
+                <div class="nav-module-header @((SubLinkClass("/routes") == "active" || SubLinkClass("/rate-contracts") == "active") ? "active-module" : "")" title="Routes &amp; Rates">
+                    <i class="bi bi-signpost-split"></i> <span class="nav-text">Routes &amp; Rates</span>
+                </div>
+                <a class="nav-sublink @SubLinkClass("/routes")" href="/routes" title="Route Master">
+                    <i class="bi bi-list-ul"></i> <span class="nav-text">Route Master</span>
+                </a>
+                <a class="nav-sublink @SubLinkClass("/rate-contracts")" href="/rate-contracts" title="Rate Contracts">
+                    <i class="bi bi-file-earmark-text"></i> <span class="nav-text">Rate Contracts</span>
+                </a>
+            </div>
+
+            <div class="nav-module">
                 <div class="nav-module-header @(SubLinkClass("/fuel-entries") == "active" ? "active-module" : "")" title="Fuel Management">
                     <i class="bi bi-fuel-pump"></i> <span class="nav-text">Fuel Management</span>
                 </div>

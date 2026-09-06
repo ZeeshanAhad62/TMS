@@ -41,6 +41,8 @@ public class FleetDbContext : DbContext
     public DbSet<VehiclePosition> VehiclePositions => Set<VehiclePosition>();
     public DbSet<Geofence> Geofences => Set<Geofence>();
     public DbSet<GeofenceEvent> GeofenceEvents => Set<GeofenceEvent>();
+    public DbSet<RouteMaster> Routes => Set<RouteMaster>();
+    public DbSet<RateContract> RateContracts => Set<RateContract>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -213,6 +215,11 @@ public class FleetDbContext : DbContext
                 .HasForeignKey(t => t.CustomerId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            entity.HasOne(t => t.Route)
+                .WithMany()
+                .HasForeignKey(t => t.RouteId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             entity.HasMany(t => t.Expenses)
                 .WithOne(e => e.Trip)
                 .HasForeignKey(e => e.TripId)
@@ -380,6 +387,33 @@ public class FleetDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.VehicleId)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<RouteMaster>(entity =>
+        {
+            entity.ToTable("Routes");
+            entity.HasIndex(r => r.RouteCode).IsUnique();
+            entity.HasIndex(r => new { r.Origin, r.Destination });
+            entity.Property(r => r.DistanceKm).HasPrecision(10, 2);
+            entity.Property(r => r.EstimatedDurationHours).HasPrecision(6, 2);
+            entity.Property(r => r.StandardRate).HasPrecision(18, 2);
+
+            entity.HasMany(r => r.RateContracts)
+                .WithOne(c => c.Route)
+                .HasForeignKey(c => c.RouteId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RateContract>(entity =>
+        {
+            entity.HasIndex(c => c.ContractCode).IsUnique();
+            entity.HasIndex(c => new { c.CustomerId, c.RouteId });
+            entity.Property(c => c.Rate).HasPrecision(18, 2);
+
+            entity.HasOne(c => c.Customer)
+                .WithMany()
+                .HasForeignKey(c => c.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

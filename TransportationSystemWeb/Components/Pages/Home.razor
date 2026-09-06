@@ -22,6 +22,7 @@
         <a class="btn btn-outline-primary btn-sm" href="/parts"><i class="bi bi-box-seam me-1"></i>Parts</a>
         <a class="btn btn-outline-primary btn-sm" href="/payruns"><i class="bi bi-cash-coin me-1"></i>Payroll</a>
         <a class="btn btn-outline-primary btn-sm" href="/tracking"><i class="bi bi-geo-alt me-1"></i>Live Map</a>
+        <a class="btn btn-outline-primary btn-sm" href="/routes"><i class="bi bi-signpost-split me-1"></i>Routes</a>
     </div>
 </div>
 
@@ -895,6 +896,56 @@ else
             </div>
         </div>
     }
+
+    @if (_routes is not null)
+    {
+        <div class="row g-3 mt-1">
+            <div class="col-lg-8">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Routes</div>
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-signpost-split"></i></div>
+                            </div>
+                            <div class="stat-value">@_routes.Count</div>
+                            <div class="stat-sub text-muted">@_routes.Count(r => r.IsActive) active</div>
+                        </div></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Rate Contracts</div>
+                                <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-file-earmark-text"></i></div>
+                            </div>
+                            <div class="stat-value">@(_rateContracts?.Count ?? 0)</div>
+                            <div class="stat-sub text-muted">@(_rateContracts?.Count(c => c.IsCurrentlyValid) ?? 0) valid now</div>
+                        </div></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card h-100"><div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="stat-label">Priced Routes</div>
+                                <div class="stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-cash"></i></div>
+                            </div>
+                            <div class="stat-value">@_routes.Count(r => r.StandardRate.HasValue || r.ActiveContractCount > 0)</div>
+                            <div class="stat-sub text-muted">Have a standard rate or contract</div>
+                        </div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100"><div class="card-body d-flex flex-column">
+                    <h6 class="mb-3">Routes &amp; Rates</h6>
+                    <div class="text-muted small mb-3">Route master feeds trip origin/destination and the revenue default; the best matching rate contract wins.</div>
+                    <div class="mt-auto d-flex gap-2">
+                        <a class="btn btn-outline-primary btn-sm" href="/routes"><i class="bi bi-signpost-split me-1"></i>Routes</a>
+                        <a class="btn btn-outline-primary btn-sm" href="/rate-contracts"><i class="bi bi-file-earmark-text me-1"></i>Contracts</a>
+                    </div>
+                </div></div>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -910,6 +961,8 @@ else
     private List<PartListItemDto>? _parts;
     private List<PayRunListItemDto>? _payRuns;
     private List<LiveVehicleDto>? _live;
+    private List<RouteListItemDto>? _routes;
+    private List<RateContractListItemDto>? _rateContracts;
     private string? _error;
     private bool _showExpiringOnly;
     private bool _chartsRendered;
@@ -930,6 +983,8 @@ else
             _parts = await Api.GetPartsAsync();
             _payRuns = await Api.GetPayRunsAsync();
             _live = await Api.GetLiveVehiclesAsync();
+            _routes = await Api.GetRoutesAsync();
+            _rateContracts = await Api.GetRateContractsAsync();
         }
         catch (Exception ex)
         {
