@@ -17,7 +17,8 @@ public static class DriverMapper
         Status = d.Status,
         LicenseExpiryDate = d.LicenseExpiryDate,
         HasExpiringDocument = IsExpiringOrExpired(d.LicenseExpiryDate),
-        AdvancesOutstanding = PayrollMapper.AdvancesOutstanding(d.Advances)
+        AdvancesOutstanding = PayrollMapper.AdvancesOutstanding(d.Advances),
+        AppLoginEnabled = d.AppLoginEnabled
     };
 
     public static DriverDetailDto ToDetailDto(Driver d) => new()
@@ -37,6 +38,10 @@ public static class DriverMapper
         Status = d.Status,
         PayType = d.PayType,
         PayRate = d.PayRate,
+        AppLoginEnabled = d.AppLoginEnabled,
+        // AppPassword is intentionally not copied back -- write-only.
+        AppLoginConfigured = !string.IsNullOrEmpty(d.AppPassword),
+        AppLastLoginAt = d.AppLastLoginAt,
 
         AdvancesOutstanding = PayrollMapper.AdvancesOutstanding(d.Advances),
 
@@ -58,6 +63,10 @@ public static class DriverMapper
         d.Status = dto.Status;
         d.PayType = dto.PayType;
         d.PayRate = dto.PayRate;
+
+        d.AppLoginEnabled = dto.AppLoginEnabled;
+        if (!string.IsNullOrWhiteSpace(dto.AppPassword))
+            d.AppPassword = dto.AppPassword.Trim();
     }
 
     public static DriverDocumentDto ToDto(DriverDocument d) => new()

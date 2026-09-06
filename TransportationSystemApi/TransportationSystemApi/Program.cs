@@ -16,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers(options =>
     {
         options.Filters.Add(new AuthorizeFilter());
+        options.Filters.Add<TransportationSystemApi.Services.StaffOnlyFilter>();
     })
     .AddJsonOptions(options =>
     {
@@ -57,7 +58,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Scoped policy for the mobile driver app (module 13).
+    options.AddPolicy("DriverApp", policy => policy.RequireClaim("token_type", "driver-app"));
+});
 
 builder.Services.AddCors(options =>
 {
@@ -78,6 +83,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseDefaultFiles(); // serves driver-app/index.html for /driver-app/
 app.UseStaticFiles();
 
 // No UseHttpsRedirection(): this API is only ever called server-to-server by the

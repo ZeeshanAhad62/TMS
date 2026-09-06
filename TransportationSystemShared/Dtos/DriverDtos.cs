@@ -14,6 +14,7 @@ public class DriverListItemDto
     public DateOnly? LicenseExpiryDate { get; set; }
     public bool HasExpiringDocument { get; set; }
     public decimal AdvancesOutstanding { get; set; }
+    public bool AppLoginEnabled { get; set; }
 }
 
 public class DriverDetailDto : DriverUpsertDto
@@ -25,6 +26,10 @@ public class DriverDetailDto : DriverUpsertDto
 
     // Advances still owed across all pay runs (Σ Amount - Σ RecoveredAmount).
     public decimal AdvancesOutstanding { get; set; }
+
+    // Read-only app-access status (AppPassword itself is never returned).
+    public bool AppLoginConfigured { get; set; }
+    public DateTime? AppLastLoginAt { get; set; }
 
     public List<DriverDocumentDto> Documents { get; set; } = new();
     public List<DriverVehicleAssignmentDto> Assignments { get; set; } = new();
@@ -58,6 +63,14 @@ public class DriverUpsertDto
 
     [Range(0, 999999999)]
     public decimal? PayRate { get; set; }
+
+    // Mobile driver-app access (module 13). AppPassword is write-only: send it
+    // to set/change the login password, leave it null to keep the current one.
+    // It is never returned on a DriverDetailDto.
+    public bool AppLoginEnabled { get; set; }
+
+    [MaxLength(200)]
+    public string? AppPassword { get; set; }
 }
 
 public class DriverDocumentDto

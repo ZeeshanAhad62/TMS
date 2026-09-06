@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @inject FleetApiClient Api
 @inject IJSRuntime JS
+@inject IConfiguration Config
 
 <PageTitle>Overview - Transportation Management System</PageTitle>
 
@@ -1045,9 +1046,33 @@ else
             </div>
         </div>
     }
+
+    @if (_drivers is not null)
+    {
+        <div class="row g-3 mt-1">
+            <div class="col-lg-4">
+                <div class="card stat-card h-100"><div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="stat-label">Drivers with App Access</div>
+                        <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-phone"></i></div>
+                    </div>
+                    <div class="stat-value">@_drivers.Count(d => d.AppLoginEnabled) <span class="fs-6 text-muted">/ @_drivers.Count</span></div>
+                    <div class="stat-sub text-muted">Can sign in to the mobile driver app</div>
+                </div></div>
+            </div>
+            <div class="col-lg-8">
+                <div class="card h-100"><div class="card-body d-flex flex-column">
+                    <h6 class="mb-2">Mobile Driver App</h6>
+                    <div class="text-muted small mb-3">Drivers see their trips, start/finish them, log expenses &amp; fuel, and record deliveries + POD photos. Enable access and set a password on each driver's <strong>App Access</strong> tab.</div>
+                    <a class="btn btn-outline-primary btn-sm mt-auto align-self-start" href="@DriverAppUrl" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>Open Driver App</a>
+                </div></div>
+            </div>
+        </div>
+    }
 }
 
 @code {
+    private string DriverAppUrl => (Config["ApiBaseUrl"]?.TrimEnd('/') ?? "") + "/driver-app/";
     private List<VehicleListItemDto>? _vehicles;
     private List<DriverListItemDto>? _drivers;
     private List<TripListItemDto>? _trips;

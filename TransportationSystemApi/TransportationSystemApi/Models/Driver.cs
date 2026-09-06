@@ -25,6 +25,12 @@ public class Driver
     public DriverPayType PayType { get; set; } = DriverPayType.PerTrip;
     public decimal? PayRate { get; set; }
 
+    // Mobile driver-app login (module 13). AppPassword is plain text, matching
+    // the project's deliberate plain-text choice for staff Users.
+    public bool AppLoginEnabled { get; set; }
+    public string? AppPassword { get; set; }
+    public DateTime? AppLastLoginAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 

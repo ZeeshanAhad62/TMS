@@ -224,6 +224,44 @@ else
                 </div></div>
             }
         }
+        else if (_activeTab == "App Access")
+        {
+            <div class="card"><div class="card-body">
+                <h5 class="card-title">Mobile Driver App</h5>
+                <p class="text-muted small">
+                    The driver signs in at <code>/driver-app/</code> with their <strong>driver code</strong>
+                    (@(_detail?.DriverCode ?? "assigned on save")) and the password set here. From the app they can
+                    see their trips, start/finish a trip, log expenses and fuel, and record deliveries + POD photos.
+                </p>
+                <div class="row g-3">
+                    <div class="col-md-12">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="appLogin" @bind="_model.AppLoginEnabled" />
+                            <label class="form-check-label" for="appLogin">App login enabled</label>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">App Password</label>
+                        <InputText type="password" class="form-control" @bind-Value="_model.AppPassword"
+                                   placeholder="@(_detail?.AppLoginConfigured == true ? "•••••••• (leave blank to keep)" : "set a password")" />
+                        <ValidationMessage For="() => _model.AppPassword" />
+                    </div>
+                    <div class="col-md-7 d-flex align-items-end">
+                        <div class="text-muted small">
+                            @if (_detail?.AppLoginConfigured == true)
+                            {
+                                <text>Password is set. Last app login: <strong>@(_detail.AppLastLoginAt?.ToLocalTime().ToString("dd-MMM-yyyy HH:mm") ?? "never")</strong>.</text>
+                            }
+                            else
+                            {
+                                <text>No password set yet.</text>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="text-muted small mt-2">Saved with the <strong>Save Changes</strong> button below.</div>
+            </div></div>
+        }
         else if (_activeTab == "Vehicle Assignments" && _detail is not null)
         {
             <div class="card"><div class="card-body">
@@ -286,7 +324,7 @@ else
 
     private bool IsNew => Id is null;
 
-    private static readonly string[] Tabs = { "Driver Details", "License & Documents", "Vehicle Assignments", "Payroll" };
+    private static readonly string[] Tabs = { "Driver Details", "License & Documents", "Vehicle Assignments", "Payroll", "App Access" };
 
     private string _activeTab = "Driver Details";
     private bool _loading = true;
